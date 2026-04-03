@@ -1,523 +1,623 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Zap, 
-  Droplets, 
-  Maximize2, 
-  Sun, 
-  Palette, 
-  Volume2, 
-  Pause, 
-  Play,
-  Monitor,
-  Activity,
-  ChevronRight,
-  ChevronLeft,
-  Crosshair,
-  Wifi,
-  Cpu
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NCANDELA SGX VISUALIZER</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Orbitron & Share Tech Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-const App = () => {
-  const canvasRef = useRef(null);
-  const videoRef = useRef(null);
-  const analyserRef = useRef(null);
-  const dataArrayRef = useRef(null);
-  const animationIdRef = useRef(null);
-  
-  const [showControls, setShowControls] = useState(true);
-  const [isAudioActive, setIsAudioActive] = useState(false);
-  const [isFrozen, setIsFrozen] = useState(false);
-  const [syncRate, setSyncRate] = useState(99);
+    <style>
+        :root {
+            --sgx-blue: #32527B;
+            --sgx-yellow: #FDCC0D;
+            --sgx-copper: #B87333;
+        }
 
-  // Parámetros del motor
-  const [params, setParams] = useState({
-    glitch: 18,
-    distort: 12,
-    liquify: 25,
-    cycleSpeed: 8,
-    brightness: 1.15,
-    canvasScale: 85,
-  });
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--sgx-yellow);
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-  const modulatedParams = useRef({ ...params });
+        .font-mono-tech {
+            font-family: 'Share Tech Mono', monospace;
+        }
 
-  const updateParam = (key, val) => {
-    setParams(prev => ({ ...prev, [key]: parseFloat(val) }));
-  };
-
-  // Simular métricas HUD
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSyncRate(Math.floor(Math.random() * 5 + 95));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Inicializar Video y WebGL
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
-
-    if (!gl) {
-      console.error("WebGL no está soportado en este navegador.");
-      return;
-    }
-
-    // Vertex Shader
-    const vsSource = `
-      attribute vec2 a_position;
-      attribute vec2 a_texCoord;
-      varying vec2 v_texCoord;
-      void main() {
-        gl_Position = vec4(a_position, 0, 1);
-        v_texCoord = a_texCoord;
-      }
-    `;
-
-    // Fragment Shader (Corregido el error de tipos en GLSL)
-    const fsSource = `
-      precision highp float;
-      uniform sampler2D u_image;
-      uniform float u_time;
-      uniform float u_glitch;
-      uniform float u_distort;
-      uniform float u_liquify;
-      uniform float u_cycle;
-      uniform float u_bright;
-      varying vec2 v_texCoord;
-
-      float rand(vec2 co) {
-        return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-      }
-
-      void main() {
-        vec2 uv = v_texCoord;
+        /* --- ESTILOS EXÓTICOS Y HOLOGRÁFICOS --- */
         
-        // --- LIQUIFY / WARP ---
-        float lStr = u_liquify * 0.003;
-        uv.x += sin(uv.y * 15.0 + u_time * 3.0) * lStr;
-        uv.y += cos(uv.x * 12.0 + u_time * 2.2) * lStr;
-
-        // --- EXOTIC WAVE DISTORTION ---
-        uv.y += sin(uv.x * 40.0 + u_time * 10.0) * (u_distort * 0.005);
-
-        // --- HOLOGRAPHIC GLITCH ---
-        vec2 offsetR = vec2(0.0);
-        vec2 offsetB = vec2(0.0);
-        float gTrigger = step(0.95 - (u_glitch * 0.008), rand(vec2(u_time, 1.0)));
-        
-        if(gTrigger > 0.0) {
-          float block = floor(uv.y * 25.0);
-          float noise = (rand(vec2(block, u_time)) - 0.5) * (u_glitch * 0.08);
-          uv.x += noise;
-          offsetR.x = (u_glitch * 0.04);
-          offsetB.x = -(u_glitch * 0.04);
+        /* Panel Holográfico Flotante (Minimalista) */
+        .holo-panel {
+            background: linear-gradient(135deg, rgba(5, 8, 12, 0.85) 0%, rgba(50, 82, 123, 0.4) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(253, 204, 13, 0.3);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(50, 82, 123, 0.2);
+            clip-path: polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px);
         }
 
-        vec3 color;
-        color.r = texture2D(u_image, uv + offsetR).r;
-        color.g = texture2D(u_image, uv).g;
-        color.b = texture2D(u_image, uv + offsetB).b;
-
-        // --- SPECTRUM CYCLE ---
-        if(u_cycle > 0.0) {
-          float hue = u_time * u_cycle * 0.25;
-          float s = sin(hue); float c = cos(hue);
-          vec3 w = vec3(0.3333);
-          float d = dot(color, w);
-          vec3 diff = color - d;
-          color = d + diff * c + cross(w, diff) * s;
+        .holo-btn {
+            background: rgba(50, 82, 123, 0.1);
+            border: 1px solid rgba(50, 82, 123, 0.5);
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .holo-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(253, 204, 13, 0.2), transparent);
+            transition: all 0.5s ease;
+        }
+        .holo-btn:hover {
+            border-color: var(--sgx-yellow);
+            box-shadow: 0 0 20px rgba(253, 204, 13, 0.2);
+        }
+        .holo-btn:hover::before {
+            left: 100%;
+        }
+        .holo-btn.active {
+            background: rgba(184, 115, 51, 0.2);
+            border-color: var(--sgx-copper);
+            color: var(--sgx-copper);
+            box-shadow: inset 0 0 20px rgba(184, 115, 51, 0.2), 0 0 20px rgba(184, 115, 51, 0.4);
         }
 
-        // --- DIGITAL NOISE & SCANLINES (CORREGIDO) ---
-        float scanline = sin(uv.y * 1000.0) * 0.04;
-        color -= vec3(scanline);
-        float noise = (rand(uv + vec2(u_time, u_time * 0.5)) - 0.5) * 0.04;
-        color += vec3(noise);
-
-        color *= u_bright;
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `;
-
-    const createShader = (gl, type, source) => {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Error compilando shader:', gl.getShaderInfoLog(shader));
-      }
-      return shader;
-    };
-
-    const program = gl.createProgram();
-    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
-    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
-    gl.linkProgram(program);
-    gl.useProgram(program);
-
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,0,1, 1,-1,1,1, -1,1,0,0, -1,1,0,0, 1,-1,1,1, 1,1,1,0]), gl.STATIC_DRAW);
-
-    const posLoc = gl.getAttribLocation(program, "a_position");
-    const texLoc = gl.getAttribLocation(program, "a_texCoord");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 16, 0);
-    gl.enableVertexAttribArray(texLoc);
-    gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, 16, 8);
-
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-    const locs = {
-      time: gl.getUniformLocation(program, "u_time"),
-      glitch: gl.getUniformLocation(program, "u_glitch"),
-      distort: gl.getUniformLocation(program, "u_distort"),
-      liquify: gl.getUniformLocation(program, "u_liquify"),
-      cycle: gl.getUniformLocation(program, "u_cycle"),
-      bright: gl.getUniformLocation(program, "u_bright"),
-    };
-
-    const render = (time) => {
-      // Audio Math
-      if (isAudioActive && analyserRef.current) {
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-        const bass = dataArrayRef.current.slice(0, 6).reduce((a, b) => a + b, 0) / 6 / 255;
-        const mid = dataArrayRef.current.slice(6, 24).reduce((a, b) => a + b, 0) / 18 / 255;
-        const high = dataArrayRef.current.slice(24, 60).reduce((a, b) => a + b, 0) / 36 / 255;
-
-        modulatedParams.current = {
-          glitch: params.glitch + (bass * 150), 
-          distort: params.distort + (mid * 100),
-          liquify: params.liquify + (high * 180),
-          cycleSpeed: params.cycleSpeed + (bass * 40),
-          brightness: params.brightness + (bass * 0.8),
-        };
-      } else {
-        modulatedParams.current = { ...params };
-      }
-
-      // Draw
-      if (video.readyState >= video.HAVE_CURRENT_DATA) {
-        if (!isFrozen || !animationIdRef.current) {
-           gl.bindTexture(gl.TEXTURE_2D, texture);
-           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-        }
-        
-        if (canvas.width !== video.videoWidth) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          gl.viewport(0, 0, canvas.width, canvas.height);
-        }
-
-        gl.uniform1f(locs.time, time * 0.001);
-        gl.uniform1f(locs.glitch, modulatedParams.current.glitch);
-        gl.uniform1f(locs.distort, modulatedParams.current.distort);
-        gl.uniform1f(locs.liquify, modulatedParams.current.liquify);
-        gl.uniform1f(locs.cycle, modulatedParams.current.cycleSpeed);
-        gl.uniform1f(locs.bright, modulatedParams.current.brightness);
-
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-      }
-      animationIdRef.current = requestAnimationFrame(render);
-    };
-
-    // Force play if possible
-    video.play().catch(() => console.log("Waiting for user tap to play video"));
-    animationIdRef.current = requestAnimationFrame(render);
-
-    return () => cancelAnimationFrame(animationIdRef.current);
-  }, [isAudioActive, isFrozen, params]);
-
-  // Asegurar reproducción con cualquier toque en pantalla (Bypass Mobile Autoplay Policy)
-  const forceInteraction = () => {
-    if (videoRef.current && videoRef.current.paused) {
-      videoRef.current.play();
-    }
-  };
-
-  const toggleAudio = async () => {
-    if (!isAudioActive) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        analyserRef.current = analyser;
-        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-        setIsAudioActive(true);
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-        if (videoRef.current && videoRef.current.paused) videoRef.current.play();
-      } catch (err) { 
-        alert("Microphone access required for Epic Mode.");
-      }
-    } else {
-      setIsAudioActive(false);
-    }
-  };
-
-  return (
-    <div 
-      className="relative w-full h-screen bg-[#020305] flex items-center justify-center overflow-hidden font-scifi select-none text-[#FDCC0D]"
-      onClick={forceInteraction}
-    >
-      {/* INJECT EXOTIC FONT & CSS */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
-        .font-scifi { font-family: 'Orbitron', sans-serif; }
-        .font-tech { font-family: 'Rajdhani', sans-serif; }
-        
-        .sci-fi-panel {
-            clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
-        }
-        .sci-fi-btn {
-            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-        }
-
+        /* Sliders Láser de Alta Precisión */
         .cyber-range {
             -webkit-appearance: none;
             background: transparent;
             width: 100%;
         }
+        .cyber-range:focus {
+            outline: none;
+        }
         .cyber-range::-webkit-slider-runnable-track {
-            height: 4px;
-            background: rgba(50, 82, 123, 0.4);
-            border-radius: 2px;
+            height: 1px;
+            background: rgba(253, 204, 13, 0.3);
+            position: relative;
         }
         .cyber-range::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 18px;
-            width: 8px;
-            background: #FDCC0D;
-            margin-top: -7px;
-            box-shadow: 0 0 10px #FDCC0D;
-            cursor: pointer;
-            clip-path: polygon(0 0, 100% 20%, 100% 100%, 0 80%);
-            transition: transform 0.1s;
+            height: 14px;
+            width: 4px;
+            background: var(--sgx-yellow);
+            margin-top: -6px;
+            box-shadow: 0 0 15px var(--sgx-yellow), 0 0 5px #fff;
+            cursor: ew-resize;
+            transition: transform 0.1s, background 0.3s;
         }
-        .cyber-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .cyber-range::-webkit-slider-thumb:active {
+            transform: scaleX(2);
+            background: #fff;
+        }
+
+        /* Animación del Menú Overlay */
+        #hologram-menu {
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -45%) scale(0.98);
+            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        #hologram-menu.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Botón de Toggle Flotante Central */
+        .float-toggle {
+            animation: pulseGlow 3s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 10px rgba(50, 82, 123, 0.5); border-color: rgba(50, 82, 123, 0.8); }
+            100% { box-shadow: 0 0 25px rgba(253, 204, 13, 0.6); border-color: rgba(253, 204, 13, 0.8); }
+        }
+
+        /* Efectos de Texto Glow */
+        .text-glow-yellow { text-shadow: 0 0 15px rgba(253, 204, 13, 0.9); }
         
-        .bg-rotating-grid {
-            background-size: 50px 50px;
-            background-image: 
-              linear-gradient(to right, rgba(50, 82, 123, 0.1) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(50, 82, 123, 0.1) 1px, transparent 1px);
-            animation: rotateGrid 100s linear infinite;
-        }
-        @keyframes rotateGrid {
-            0% { transform: scale(2) rotate(0deg); }
-            100% { transform: scale(2) rotate(360deg); }
-        }
-        
-        .hud-bracket {
+        /* Retícula de Enfoque */
+        .reticle-corner {
             position: absolute;
             width: 30px;
             height: 30px;
-            border-color: #FDCC0D;
-            border-style: solid;
-            opacity: 0.8;
+            border: 1px solid rgba(253, 204, 13, 0.3);
             transition: all 0.3s ease;
         }
-        .canvas-container:hover .hud-bracket {
-            width: 40px; height: 40px; opacity: 1;
-            box-shadow: 0 0 20px rgba(253, 204, 13, 0.4);
-        }
+        
+        /* Ocultar Scrollbar */
+        ::-webkit-scrollbar { width: 2px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(50, 82, 123, 0.5); }
+    </style>
+</head>
+<body onclick="wakeUpMedia()">
 
-        .custom-scroll::-webkit-scrollbar { width: 3px; }
-        .custom-scroll::-webkit-scrollbar-track { background: rgba(50, 82, 123, 0.1); }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #FDCC0D; }
-      `}} />
+    <!-- CANVAS FULL SCREEN -->
+    <div class="fixed inset-0 w-full h-full z-0 bg-black flex items-center justify-center">
+        <!-- Retículas Centrales (Estilo HUD) -->
+        <div class="absolute inset-8 md:inset-16 pointer-events-none z-10 opacity-30 mix-blend-screen">
+            <div class="reticle-corner top-0 left-0 border-r-0 border-b-0"></div>
+            <div class="reticle-corner top-0 right-0 border-l-0 border-b-0"></div>
+            <div class="reticle-corner bottom-0 left-0 border-r-0 border-t-0"></div>
+            <div class="reticle-corner bottom-0 right-0 border-l-0 border-t-0"></div>
+        </div>
 
-      {/* ROTATING HOLOGRAPHIC GRID */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -inset-[50%] bg-rotating-grid origin-center opacity-70"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#020305_85%)]"></div>
-      </div>
+        <canvas id="glCanvas" class="w-full h-full object-cover opacity-100 transition-opacity duration-1000"></canvas>
+        
+        <!-- VIÑETA Y RUIDO -->
+        <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.85)_100%)] z-10"></div>
+        <div class="absolute inset-0 pointer-events-none opacity-[0.03] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] z-10"></div>
+    </div>
 
-      {/* MAIN VISUALIZER FRAME (EXOTIC TARGETING SYSTEM) */}
-      <div 
-        style={{ 
-          width: `${params.canvasScale}%`, 
-          height: `calc(${params.canvasScale}% * 0.56)`,
-          maxHeight: '80vh'
-        }}
-        className="relative z-10 flex items-center justify-center canvas-container group"
-      >
-        {/* CORNER BRACKETS (Targeting HUD) */}
-        <div className="hud-bracket border-t-2 border-l-2 -top-2 -left-2"></div>
-        <div className="hud-bracket border-t-2 border-r-2 -top-2 -right-2"></div>
-        <div className="hud-bracket border-b-2 border-l-2 -bottom-2 -left-2"></div>
-        <div className="hud-bracket border-b-2 border-r-2 -bottom-2 -right-2"></div>
-
-        {/* CANVAS WRAPPER */}
-        <div className={`w-full h-full relative sci-fi-panel overflow-hidden border-2 border-[#32527B]/60 bg-black/80 backdrop-blur-md transition-all duration-500 ${isAudioActive ? 'shadow-[0_0_80px_rgba(253,204,13,0.15)]' : 'shadow-[0_0_50px_rgba(50,82,123,0.3)]'}`}>
-            
-            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover opacity-100" />
-            
-            {/* INNER HUD OVERLAY */}
-            <div className="absolute top-4 left-5 flex flex-col gap-1 opacity-90 pointer-events-none">
-                <div className="flex items-center gap-2">
-                    <Crosshair size={18} className={isAudioActive ? "text-red-500 animate-spin-slow" : "text-[#FDCC0D]"} />
-                    <span className="text-sm font-black tracking-[0.4em] uppercase text-white drop-shadow-[0_0_8px_#32527B]">
+    <!-- CAPA HUD PRINCIPAL -->
+    <div class="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 md:p-10">
+        
+        <!-- HEADER HUD: LOGO COOL + NOMBRE -->
+        <div class="flex justify-between items-start">
+            <div class="flex items-center gap-4 md:gap-6 bg-black/20 backdrop-blur-sm p-3 md:p-4 rounded-xl border border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                
+                <!-- EL LOGO EXÓTICO (Rayo + Precisión) -->
+                <div class="relative w-12 h-12 md:w-16 md:h-16 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-crosshairs absolute text-[#32527B] text-4xl md:text-5xl animate-[spin_8s_linear_infinite] opacity-80 drop-shadow-[0_0_5px_rgba(50,82,123,0.8)]"></i>
+                    <i class="fa-solid fa-bolt text-[#FDCC0D] text-xl md:text-2xl z-10 text-glow-yellow"></i>
+                </div>
+                
+                <!-- NOMBRE Y ESTADO -->
+                <div class="flex flex-col mt-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div id="main-status-dot" class="w-1.5 h-1.5 rounded-full bg-[#32527B]"></div>
+                        <span class="font-mono-tech text-[8px] md:text-[10px] text-white/50 tracking-[0.3em] font-bold uppercase" id="main-status-text">
+                            SYSTEM STANDBY
+                        </span>
+                    </div>
+                    <h1 class="text-lg md:text-2xl font-black tracking-[0.15em] text-white text-glow-yellow leading-none">
                         NCANDELA SGX VISUALIZER
+                    </h1>
+                </div>
+            </div>
+            
+            <!-- DECORACIÓN TOP RIGHT (Líneas tecnológicas) -->
+            <div class="hidden md:flex gap-2 opacity-40">
+                <div class="w-2 h-8 bg-[#32527B] skew-x-[-20deg]"></div>
+                <div class="w-6 h-8 bg-[#FDCC0D] skew-x-[-20deg]"></div>
+                <div class="w-16 h-8 bg-[#32527B]/30 skew-x-[-20deg]"></div>
+            </div>
+        </div>
+
+        <!-- FOOTER HUD -->
+        <div class="flex justify-between items-end w-full relative">
+            
+            <!-- BARRAS AUDIO REACTIVAS (Absoluto Centro Abajo) -->
+            <div id="hud-audio-bars" class="absolute left-1/2 bottom-0 transform -translate-x-1/2 flex items-end gap-[2px] md:gap-[4px] h-24 w-[60%] max-w-2xl opacity-0 transition-opacity duration-500">
+                <!-- Generado por JS -->
+            </div>
+
+            <!-- ESPACIO VACÍO IZQUIERDA -->
+            <div class="w-32"></div>
+
+            <!-- POWERED BY SPATIALGINEERS (Reemplazo del Sync Rate) -->
+            <div class="flex items-center gap-3 bg-black/40 backdrop-blur-sm px-5 py-3 border border-[#32527B]/30 rounded-lg shadow-[0_0_20px_rgba(50,82,123,0.2)]">
+                <div class="flex flex-col items-end">
+                    <span class="text-[7px] md:text-[8px] font-mono-tech text-white/50 tracking-[0.3em] uppercase mb-0.5">
+                        Powered By
+                    </span>
+                    <span class="text-xs md:text-sm tracking-[0.1em] text-[#FDCC0D] font-black text-glow-yellow">
+                        SPATIALGINEERS
                     </span>
                 </div>
-                <span className="font-tech text-[#FDCC0D] text-[10px] tracking-widest pl-7">SYS.CORE // RENDER ACTIVE</span>
+                <i class="fa-solid fa-cube text-[#32527B] text-xl md:text-2xl animate-pulse drop-shadow-[0_0_8px_rgba(50,82,123,0.8)]"></i>
             </div>
-            
-            <div className="absolute bottom-4 right-5 flex items-center gap-3 opacity-80 pointer-events-none bg-black/40 px-3 py-1 border border-[#32527B]/50 rounded-full backdrop-blur-sm">
-                <span className="font-tech text-[10px] tracking-widest text-white">SYNC: <span className="text-[#FDCC0D] font-bold">{syncRate}%</span></span>
-                <Wifi size={12} className={syncRate > 97 ? "text-green-400" : "text-[#FDCC0D]"} />
-            </div>
-
-            {/* REACTIVE AUDIO BARS */}
-            {isAudioActive && (
-            <div className="absolute bottom-0 left-0 w-full flex items-end gap-1 h-28 px-8 opacity-40 pointer-events-none">
-                {[...Array(40)].map((_, i) => (
-                <div 
-                    key={i} 
-                    className="flex-1 bg-gradient-to-t from-[#B87333] via-[#FDCC0D] to-white" 
-                    style={{ 
-                        height: `${Math.max(2, Math.random() * 100)}%`, 
-                        transition: 'height 0.05s ease',
-                        boxShadow: '0 0 15px rgba(253, 204, 13, 0.5)'
-                    }} 
-                />
-                ))}
-            </div>
-            )}
         </div>
-      </div>
+    </div>
 
-      {/* FLOATING EXOTIC CONTROL PANEL */}
-      <div className={`absolute top-1/2 -translate-y-1/2 right-4 h-[85vh] w-[300px] md:w-[340px] z-[105] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${showControls ? 'translate-x-0' : 'translate-x-[110%]'}`}>
+    <!-- BOTÓN CENTRAL FLOTANTE (ABRIR MENÚ) -->
+    <div class="fixed bottom-12 left-1/2 transform -translate-x-1/2 z-40">
+        <button onclick="toggleMenu()" class="float-toggle w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#05080c]/90 border border-[#32527B] text-white flex items-center justify-center hover:bg-[#FDCC0D] hover:text-black hover:border-[#FDCC0D] transition-all duration-300 backdrop-blur-lg group">
+            <i class="fa-solid fa-sliders text-xl md:text-2xl group-hover:scale-110 transition-transform"></i>
+        </button>
+    </div>
+
+    <!-- MENÚ HOLOGRÁFICO (MODAL CENTRAL) -->
+    <div id="hologram-menu" class="fixed top-1/2 left-1/2 z-50 w-[92%] max-w-lg holo-panel p-6 md:p-10 flex flex-col">
         
-        {/* Toggle Button */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); setShowControls(!showControls); }}
-          className="absolute top-1/2 -left-10 -translate-y-1/2 w-10 h-32 sci-fi-panel bg-[#0a111a]/90 backdrop-blur-xl border border-[#32527B] flex items-center justify-center text-[#FDCC0D] hover:bg-[#32527B]/60 hover:shadow-[0_0_20px_#FDCC0D] transition-all cursor-pointer"
-        >
-          {showControls ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+        <button onclick="toggleMenu()" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[#FDCC0D]/50 hover:text-[#FDCC0D] hover:rotate-90 transition-all duration-300">
+            <i class="fa-solid fa-xmark text-xl"></i>
         </button>
 
-        {/* Panel Content */}
-        <div className="h-full sci-fi-panel bg-[#0a111a]/90 backdrop-blur-2xl border-l-2 border-t-2 border-[#32527B] p-6 flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.9)] relative" onClick={(e) => e.stopPropagation()}>
-            
-            {/* DECORATIVE ACCENTS */}
-            <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl from-[#32527B]/40 to-transparent pointer-events-none"></div>
-            <div className="absolute bottom-0 right-0 w-24 h-1 bg-[#FDCC0D] shadow-[0_0_10px_#FDCC0D]"></div>
-
-            {/* HEADER */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 sci-fi-btn bg-[#32527B]/20 border border-[#FDCC0D] flex items-center justify-center flex-shrink-0 shadow-[0_0_15px_rgba(253,204,13,0.3)]">
-                    <Cpu size={22} className="text-[#FDCC0D]" />
-                </div>
-                <div className="flex flex-col mt-1">
-                    <span className="font-tech text-[10px] text-[#32527B] tracking-[0.3em] font-bold">CONTROL OVERRIDE</span>
-                    <h2 className="text-sm font-black tracking-widest uppercase text-white">ENGINE_V6.5</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                        <div className={`w-1.5 h-1.5 rounded-sm ${isAudioActive ? 'bg-red-500 shadow-[0_0_10px_red] animate-pulse' : 'bg-green-500 shadow-[0_0_10px_green]'}`}></div>
-                        <span className="font-tech text-[10px] text-white/50 uppercase tracking-widest">{isAudioActive ? 'AUDIO_SYNCED' : 'STANDBY'}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 space-y-7 overflow-y-auto pr-3 custom-scroll">
-                
-                {/* ACTION BUTTONS */}
-                <div className="grid grid-cols-2 gap-4">
-                    <button 
-                        onClick={toggleAudio}
-                        className={`sci-fi-btn p-3 border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isAudioActive ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[inset_0_0_20px_rgba(255,0,0,0.2),0_0_15px_rgba(255,0,0,0.4)]' : 'bg-[#32527B]/10 border-[#32527B] text-[#32527B] hover:border-[#FDCC0D] hover:text-[#FDCC0D]'}`}
-                    >
-                        <Volume2 size={18} />
-                        <span className="font-tech text-[10px] font-bold uppercase tracking-[0.2em]">Epic Mod</span>
-                    </button>
-                    <button 
-                        onClick={() => setIsFrozen(!isFrozen)}
-                        className={`sci-fi-btn p-3 border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isFrozen ? 'bg-[#FDCC0D]/20 border-[#FDCC0D] text-[#FDCC0D] shadow-[0_0_15px_rgba(253,204,13,0.3)]' : 'bg-[#32527B]/10 border-[#32527B] text-[#32527B] hover:border-white hover:text-white'}`}
-                    >
-                        {isFrozen ? <Pause size={18} /> : <Play size={18} />}
-                        <span className="font-tech text-[10px] font-bold uppercase tracking-[0.2em]">Freeze</span>
-                    </button>
-                </div>
-
-                {/* MODULATORS */}
-                <div className="space-y-6 pt-2">
-                    <div className="font-tech text-[10px] text-[#32527B] font-bold tracking-[0.3em] border-b border-[#32527B]/30 pb-2 mb-4">
-                        // PARAMETERS
-                    </div>
-                    
-                    <ControlSlider label="Chroma_Glitch" icon={<Zap size={14}/>} value={params.glitch} onChange={(v) => updateParam('glitch', v)} active={isAudioActive} />
-                    <ControlSlider label="Matter_Warp" icon={<Droplets size={14}/>} value={params.liquify} onChange={(v) => updateParam('liquify', v)} active={isAudioActive} />
-                    <ControlSlider label="Phase_Distort" icon={<Maximize2 size={14}/>} value={params.distort} onChange={(v) => updateParam('distort', v)} active={isAudioActive} />
-                    <ControlSlider label="Hue_Velocity" icon={<Palette size={14}/>} value={params.cycleSpeed} onChange={(v) => updateParam('cycleSpeed', v)} active={isAudioActive} />
-                    <ControlSlider label="Frame_Scale" icon={<Monitor size={14}/>} value={params.canvasScale} onChange={(v) => updateParam('canvasScale', v)} min={30} max={100} />
-                    
-                    <div className="pt-3 border-t border-[#32527B]/30">
-                        <label className="flex items-center gap-2 text-white/70 text-[10px] uppercase tracking-widest font-bold mb-3 font-tech">
-                            <Sun size={14} className="text-[#FDCC0D]"/> Exposure_Lvl
-                        </label>
-                        <input 
-                            type="range" min="0.5" max="3" step="0.1" value={params.brightness} 
-                            onChange={(e) => updateParam('brightness', e.target.value)}
-                            className="cyber-range"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* FOOTER */}
-            <div className="mt-4 pt-4 text-center">
-                <p className="font-tech text-[11px] text-[#32527B] font-bold tracking-[0.4em] uppercase">Spatialgineers LLC</p>
+        <div class="flex items-center gap-4 mb-8 border-b border-[#32527B]/30 pb-5">
+            <i class="fa-brands fa-connectdevelop text-3xl text-[#32527B] drop-shadow-[0_0_8px_rgba(50,82,123,0.8)]"></i>
+            <div>
+                <h2 class="text-base md:text-lg font-black tracking-[0.2em] text-white">CORE CONFIG</h2>
             </div>
         </div>
-      </div>
 
-      {/* HIDDEN VIDEO SOURCE */}
-      <video 
-        ref={videoRef}
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button id="btn-audio" onclick="toggleAudio()" class="holo-btn py-4 px-2 flex flex-col items-center justify-center gap-3 text-[#32527B] group">
+                <i class="fa-solid fa-wave-square text-2xl group-hover:scale-110 transition-transform duration-300"></i>
+                <span class="text-[10px] font-bold tracking-[0.15em]">EPIC MODE</span>
+            </button>
+            <button id="btn-freeze" onclick="toggleFreeze()" class="holo-btn py-4 px-2 flex flex-col items-center justify-center gap-3 text-[#32527B] group">
+                <i id="icon-freeze" class="fa-solid fa-play text-2xl group-hover:scale-110 transition-transform duration-300"></i>
+                <span class="text-[10px] font-bold tracking-[0.15em]">STATIC FRAME</span>
+            </button>
+        </div>
+
+        <div class="space-y-6">
+            <div class="text-[9px] text-[#32527B] font-bold tracking-[0.4em] uppercase mb-4 opacity-70">
+                // NEURAL PARAMETERS
+            </div>
+            
+            <div class="group space-y-2">
+                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                    <span><i class="fa-solid fa-bolt text-[#32527B] mr-2"></i> CHROMA_GLITCH</span>
+                    <span id="val-glitch" class="font-mono-tech text-[#FDCC0D] text-xs">15</span>
+                </div>
+                <input type="range" id="c-glitch" min="0" max="100" value="15" class="cyber-range">
+            </div>
+
+            <div class="group space-y-2">
+                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                    <span><i class="fa-solid fa-droplet text-[#32527B] mr-2"></i> MATTER_WARP</span>
+                    <span id="val-liquify" class="font-mono-tech text-[#FDCC0D] text-xs">25</span>
+                </div>
+                <input type="range" id="c-liquify" min="0" max="100" value="25" class="cyber-range">
+            </div>
+
+            <div class="group space-y-2">
+                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                    <span><i class="fa-solid fa-barcode text-[#32527B] mr-2"></i> PHASE_DISTORT</span>
+                    <span id="val-distort" class="font-mono-tech text-[#FDCC0D] text-xs">10</span>
+                </div>
+                <input type="range" id="c-distort" min="0" max="100" value="10" class="cyber-range">
+            </div>
+
+            <div class="group space-y-2">
+                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                    <span><i class="fa-solid fa-palette text-[#32527B] mr-2"></i> HUE_VELOCITY</span>
+                    <span id="val-cycle" class="font-mono-tech text-[#FDCC0D] text-xs">8</span>
+                </div>
+                <input type="range" id="c-cycle" min="0" max="100" value="8" class="cyber-range">
+            </div>
+
+            <div class="group space-y-2 mt-6 pt-4 border-t border-[#32527B]/20">
+                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-[#FDCC0D] transition-colors">
+                    <span><i class="fa-solid fa-sun mr-2"></i> EXPOSURE_LVL</span>
+                    <span id="val-bright" class="font-mono-tech text-xs">1.1</span>
+                </div>
+                <input type="range" id="c-bright" min="0.5" max="3" step="0.1" value="1.1" class="cyber-range">
+            </div>
+        </div>
+    </div>
+
+    <!-- HIDDEN VIDEO SOURCE -->
+    <video 
+        id="videoElement"
         src="https://video.wixstatic.com/video/fe81a7_1d713a63efdd4b0fa77319dbf921a9bc/file"
-        autoPlay
-        loop 
-        muted 
-        playsInline 
-        crossOrigin="anonymous" 
-        className="hidden"
-      />
-    </div>
-  );
-};
+        autoplay loop muted playsinline crossorigin="anonymous" 
+        style="display:none;">
+    </video>
 
-// Componente Slider Estilo Cyberpunk
-const ControlSlider = ({ label, icon, value, onChange, active, min = 0, max = 100 }) => (
-  <div className="group space-y-2">
-    <div className="flex justify-between items-center">
-      <label className="font-tech flex items-center gap-2 text-white/70 text-[11px] uppercase tracking-[0.1em] font-bold group-hover:text-white transition-colors">
-        <span className={active ? "text-red-400" : "text-[#32527B]"}>{icon}</span> {label}
-      </label>
-      <div className="flex items-center gap-2 bg-[#020305] px-2 py-0.5 sci-fi-btn border border-[#32527B]/50">
-          {active && <div className="w-1 h-1 bg-red-500 shadow-[0_0_5px_red]"></div>}
-          <span className="font-tech text-[12px] text-[#FDCC0D] font-black">{Math.round(value)}</span>
-      </div>
-    </div>
-    <div className="relative flex items-center">
-      <input 
-        type="range" min={min} max={max} value={value} 
-        onChange={(e) => onChange(e.target.value)}
-        className="cyber-range"
-      />
-    </div>
-  </div>
-);
+    <!-- SHADERS -->
+    <script id="vs" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+        attribute vec2 a_texCoord;
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = vec4(a_position, 0, 1);
+            v_texCoord = a_texCoord;
+        }
+    </script>
 
-export default App;
+    <script id="fs" type="x-shader/x-fragment">
+        precision highp float;
+        uniform sampler2D u_image;
+        uniform float u_time;
+        uniform float u_glitch;
+        uniform float u_distort;
+        uniform float u_liquify;
+        uniform float u_cycle;
+        uniform float u_bright;
+        varying vec2 v_texCoord;
+
+        float rand(vec2 co) {
+            return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+        }
+
+        void main() {
+            vec2 uv = v_texCoord;
+            
+            // --- FLUID MATTER WARP ---
+            float lStr = u_liquify * 0.0035;
+            uv.x += sin(uv.y * 12.0 + u_time * 2.8) * lStr;
+            uv.y += cos(uv.x * 14.0 + u_time * 2.0) * lStr;
+
+            // --- EXOTIC WAVE DISTORTION ---
+            uv.y += sin(uv.x * 45.0 + u_time * 12.0) * (u_distort * 0.005);
+
+            // --- SHARP CHROMA GLITCH (Aberration) ---
+            vec2 offsetR = vec2(0.0);
+            vec2 offsetB = vec2(0.0);
+            float gTrigger = step(0.96 - (u_glitch * 0.007), rand(vec2(u_time, 1.0)));
+            
+            if(gTrigger > 0.0) {
+                float block = floor(uv.y * 30.0);
+                float noise = (rand(vec2(block, u_time)) - 0.5) * (u_glitch * 0.09);
+                uv.x += noise;
+                offsetR.x = (u_glitch * 0.045);
+                offsetB.x = -(u_glitch * 0.045);
+            }
+
+            vec3 color;
+            color.r = texture2D(u_image, uv + offsetR).r;
+            color.g = texture2D(u_image, uv).g;
+            color.b = texture2D(u_image, uv + offsetB).b;
+
+            // --- HUE VELOCITY ---
+            if(u_cycle > 0.0) {
+                float hue = u_time * u_cycle * 0.25;
+                float s = sin(hue); float c = cos(hue);
+                vec3 w = vec3(0.3333);
+                float d = dot(color, w);
+                vec3 diff = color - d;
+                color = d + diff * c + cross(w, diff) * s;
+            }
+
+            // --- DIGITAL ARTIFACTS ---
+            float scanline = sin(uv.y * 1200.0) * 0.03;
+            color -= scanline;
+            color += (rand(uv + u_time) - 0.5) * 0.04; 
+
+            color *= u_bright;
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+
+    <!-- CORE LOGIC JS -->
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        const video = document.getElementById('videoElement');
+        const menu = document.getElementById('hologram-menu');
+        const audioBarsContainer = document.getElementById('hud-audio-bars');
+        
+        let gl, program, texture;
+        let isAudioActive = false;
+        let isFrozen = false;
+        let isMenuOpen = false;
+        let audioCtx, analyser, dataArray;
+        
+        let currentParams = { glitch: 15, liquify: 25, distort: 10, cycleSpeed: 8, brightness: 1.1 };
+        let modulated = { ...currentParams };
+        let locs = {};
+
+        // Setup Audio Bars HUD
+        const NUM_BARS = 64;
+        for(let i=0; i<NUM_BARS; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'flex-1 bg-gradient-to-t from-[#B87333] via-[#FDCC0D] to-white opacity-80';
+            bar.style.height = '2px';
+            bar.style.boxShadow = '0 0 10px rgba(253, 204, 13, 0.5)';
+            bar.style.transition = 'height 0.05s ease-out';
+            audioBarsContainer.appendChild(bar);
+        }
+        const audioBars = audioBarsContainer.children;
+
+        function wakeUpMedia() {
+            if(video.paused) video.play();
+            document.body.onclick = null; 
+        }
+
+        function toggleMenu() {
+            isMenuOpen = !isMenuOpen;
+            if(isMenuOpen) {
+                menu.classList.add('open');
+            } else {
+                menu.classList.remove('open');
+            }
+        }
+
+        function initGL() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            });
+
+            const vs = createShader(gl, gl.VERTEX_SHADER, document.getElementById('vs').text);
+            const fs = createShader(gl, gl.FRAGMENT_SHADER, document.getElementById('fs').text);
+            
+            program = gl.createProgram();
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            gl.useProgram(program);
+
+            const buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,0,1, 1,-1,1,1, -1,1,0,0, -1,1,0,0, 1,-1,1,1, 1,1,1,0]), gl.STATIC_DRAW);
+
+            const posLoc = gl.getAttribLocation(program, "a_position");
+            const texLoc = gl.getAttribLocation(program, "a_texCoord");
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 16, 0);
+            gl.enableVertexAttribArray(texLoc);
+            gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, 16, 8);
+
+            texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+            locs = {
+                time: gl.getUniformLocation(program, "u_time"),
+                glitch: gl.getUniformLocation(program, "u_glitch"),
+                distort: gl.getUniformLocation(program, "u_distort"),
+                liquify: gl.getUniformLocation(program, "u_liquify"),
+                cycle: gl.getUniformLocation(program, "u_cycle"),
+                bright: gl.getUniformLocation(program, "u_bright")
+            };
+        }
+
+        function createShader(gl, type, source) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, source);
+            gl.compileShader(s);
+            return s;
+        }
+
+        function render(time) {
+            if (isAudioActive && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                let bassSum = 0, midSum = 0, highSum = 0;
+                for(let i=0; i<8; i++) bassSum += dataArray[i];
+                for(let i=8; i<30; i++) midSum += dataArray[i];
+                for(let i=30; i<80; i++) highSum += dataArray[i];
+
+                const bass = (bassSum / 8) / 255;
+                const mid = (midSum / 22) / 255;
+                const high = (highSum / 50) / 255;
+
+                // Modulación Dinámica
+                modulated.glitch = currentParams.glitch + (bass * 180);
+                modulated.liquify = currentParams.liquify + (high * 250);
+                modulated.distort = currentParams.distort + (mid * 150);
+                modulated.cycleSpeed = currentParams.cycleSpeed + (bass * 60);
+                modulated.brightness = currentParams.brightness + (bass * 0.8);
+
+                const step = Math.floor(analyser.frequencyBinCount / NUM_BARS);
+                for(let i=0; i<NUM_BARS; i++) {
+                    let val = dataArray[i * step] ? (dataArray[i * step] / 255) * 100 : 2;
+                    audioBars[i].style.height = Math.max(2, val) + '%';
+                }
+            } else {
+                modulated = { ...currentParams };
+            }
+
+            if (video.readyState >= video.HAVE_CURRENT_DATA) {
+                if (!isFrozen) {
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+                }
+
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.uniform1f(locs.time, time * 0.001);
+                gl.uniform1f(locs.glitch, modulated.glitch);
+                gl.uniform1f(locs.distort, modulated.distort);
+                gl.uniform1f(locs.liquify, modulated.liquify);
+                gl.uniform1f(locs.cycle, modulated.cycleSpeed);
+                gl.uniform1f(locs.bright, modulated.brightness);
+
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+            }
+            requestAnimationFrame(render);
+        }
+
+        function toggleFreeze() {
+            isFrozen = !isFrozen;
+            const btn = document.getElementById('btn-freeze');
+            const icon = document.getElementById('icon-freeze');
+            if(isFrozen) {
+                btn.classList.add('active');
+                icon.classList.replace('fa-play', 'fa-pause');
+            } else {
+                btn.classList.remove('active');
+                icon.classList.replace('fa-pause', 'fa-play');
+            }
+        }
+
+        async function toggleAudio() {
+            const btn = document.getElementById('btn-audio');
+            const mainDot = document.getElementById('main-status-dot');
+            const mainTxt = document.getElementById('main-status-text');
+
+            if (!isAudioActive) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaStreamSource(stream);
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 512;
+                    source.connect(analyser);
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    
+                    isAudioActive = true;
+                    if (audioCtx.state === 'suspended') await audioCtx.resume();
+                    if (video.paused) video.play();
+                    
+                    // UI ACTIVA
+                    btn.classList.add('active');
+                    mainDot.classList.replace('bg-[#32527B]', 'bg-[#B87333]');
+                    mainDot.classList.add('shadow-[0_0_10px_#B87333]', 'animate-pulse');
+                    mainTxt.innerText = 'AUDIO SYNCED';
+                    mainTxt.classList.replace('text-white/50', 'text-[#B87333]');
+                    audioBarsContainer.classList.add('active');
+
+                    // Auto-cerrar menú para inmersión
+                    setTimeout(() => { if(isMenuOpen) toggleMenu(); }, 800);
+
+                } catch (err) { 
+                    alert("Se requiere acceso al micrófono para el Modo Épico.");
+                }
+            } else {
+                isAudioActive = false;
+                // UI INACTIVA
+                btn.classList.remove('active');
+                mainDot.classList.replace('bg-[#B87333]', 'bg-[#32527B]');
+                mainDot.classList.remove('shadow-[0_0_10px_#B87333]', 'animate-pulse');
+                mainTxt.innerText = 'SYSTEM STANDBY';
+                mainTxt.classList.replace('text-[#B87333]', 'text-white/50');
+                audioBarsContainer.classList.remove('active');
+            }
+        }
+
+        // Configurar Sliders
+        const controlsParams = ['glitch', 'liquify', 'distort', 'cycle'];
+        controlsParams.forEach(id => {
+            document.getElementById('c-' + id).addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if(id === 'cycle') currentParams.cycleSpeed = val;
+                else currentParams[id] = val;
+                document.getElementById('val-'+id).innerText = Math.round(val);
+            });
+        });
+
+        document.getElementById('c-bright').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            currentParams.brightness = val;
+            document.getElementById('val-bright').innerText = val.toFixed(1);
+        });
+
+        // Inicializar
+        initGL();
+        requestAnimationFrame(render);
+
+    </script>
+</body>
+</html>
 
 

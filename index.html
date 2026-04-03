@@ -1,459 +1,523 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGX SONIC CORE V6 - AUDIO REACTIVE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background-color: #000;
-            overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
-            color: #FDCC0D;
-        }
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Zap, 
+  Droplets, 
+  Maximize2, 
+  Sun, 
+  Palette, 
+  Volume2, 
+  Pause, 
+  Play,
+  Monitor,
+  Activity,
+  ChevronRight,
+  ChevronLeft,
+  Crosshair,
+  Wifi,
+  Cpu
+} from 'lucide-react';
 
-        .bg-void {
-            position: absolute;
-            inset: 0;
-            opacity: 0.1;
-            background-image: radial-gradient(#FDCC0D 1px, transparent 1px);
-            background-size: 40px 40px;
-            pointer-events: none;
-        }
+const App = () => {
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataArrayRef = useRef(null);
+  const animationIdRef = useRef(null);
+  
+  const [showControls, setShowControls] = useState(true);
+  const [isAudioActive, setIsAudioActive] = useState(false);
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [syncRate, setSyncRate] = useState(99);
 
-        #canvas-wrapper {
-            position: relative;
-            box-shadow: 0 0 100px rgba(0,0,0,1);
-            border: 1px solid rgba(253, 204, 13, 0.1);
-            transition: all 0.4s ease;
-            overflow: hidden;
-            background: #000;
-        }
+  // Parámetros del motor
+  const [params, setParams] = useState({
+    glitch: 18,
+    distort: 12,
+    liquify: 25,
+    cycleSpeed: 8,
+    brightness: 1.15,
+    canvasScale: 85,
+  });
 
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+  const modulatedParams = useRef({ ...params });
 
-        #control-panel {
-            position: absolute;
-            top: 0; right: 0;
-            height: 100%;
-            width: 320px;
-            background: rgba(5, 5, 5, 0.98);
-            backdrop-filter: blur(25px);
-            border-left: 1px solid rgba(253, 204, 13, 0.3);
-            padding: 30px;
-            z-index: 100;
-            transform: translateX(100%);
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow-y: auto;
-        }
+  const updateParam = (key, val) => {
+    setParams(prev => ({ ...prev, [key]: parseFloat(val) }));
+  };
 
-        #control-panel.open { transform: translateX(0); }
+  // Simular métricas HUD
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSyncRate(Math.floor(Math.random() * 5 + 95));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
-        input[type=range] {
-            width: 100%;
-            accent-color: #FDCC0D;
-            background: rgba(255,255,255,0.05);
-            height: 4px;
-            border-radius: 2px;
-            appearance: none;
-        }
+  // Inicializar Video y WebGL
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
 
-        .hud-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: rgba(253, 204, 13, 0.5);
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+    if (!gl) {
+      console.error("WebGL no está soportado en este navegador.");
+      return;
+    }
 
-        .led {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #333;
-            display: inline-block;
-        }
+    // Vertex Shader
+    const vsSource = `
+      attribute vec2 a_position;
+      attribute vec2 a_texCoord;
+      varying vec2 v_texCoord;
+      void main() {
+        gl_Position = vec4(a_position, 0, 1);
+        v_texCoord = a_texCoord;
+      }
+    `;
 
-        .led-active { background: #00ff00; box-shadow: 0 0 10px #00ff00; }
+    // Fragment Shader (Corregido el error de tipos en GLSL)
+    const fsSource = `
+      precision highp float;
+      uniform sampler2D u_image;
+      uniform float u_time;
+      uniform float u_glitch;
+      uniform float u_distort;
+      uniform float u_liquify;
+      uniform float u_cycle;
+      uniform float u_bright;
+      varying vec2 v_texCoord;
+
+      float rand(vec2 co) {
+        return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+      }
+
+      void main() {
+        vec2 uv = v_texCoord;
         
-        /* Animación de pulso para el botón de audio */
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        // --- LIQUIFY / WARP ---
+        float lStr = u_liquify * 0.003;
+        uv.x += sin(uv.y * 15.0 + u_time * 3.0) * lStr;
+        uv.y += cos(uv.x * 12.0 + u_time * 2.2) * lStr;
+
+        // --- EXOTIC WAVE DISTORTION ---
+        uv.y += sin(uv.x * 40.0 + u_time * 10.0) * (u_distort * 0.005);
+
+        // --- HOLOGRAPHIC GLITCH ---
+        vec2 offsetR = vec2(0.0);
+        vec2 offsetB = vec2(0.0);
+        float gTrigger = step(0.95 - (u_glitch * 0.008), rand(vec2(u_time, 1.0)));
+        
+        if(gTrigger > 0.0) {
+          float block = floor(uv.y * 25.0);
+          float noise = (rand(vec2(block, u_time)) - 0.5) * (u_glitch * 0.08);
+          uv.x += noise;
+          offsetR.x = (u_glitch * 0.04);
+          offsetB.x = -(u_glitch * 0.04);
         }
-        .btn-epic-active {
-            animation: pulse-red 2s infinite;
+
+        vec3 color;
+        color.r = texture2D(u_image, uv + offsetR).r;
+        color.g = texture2D(u_image, uv).g;
+        color.b = texture2D(u_image, uv + offsetB).b;
+
+        // --- SPECTRUM CYCLE ---
+        if(u_cycle > 0.0) {
+          float hue = u_time * u_cycle * 0.25;
+          float s = sin(hue); float c = cos(hue);
+          vec3 w = vec3(0.3333);
+          float d = dot(color, w);
+          vec3 diff = color - d;
+          color = d + diff * c + cross(w, diff) * s;
         }
-    </style>
-</head>
-<body>
 
-    <div class="bg-void"></div>
+        // --- DIGITAL NOISE & SCANLINES (CORREGIDO) ---
+        float scanline = sin(uv.y * 1000.0) * 0.04;
+        color -= vec3(scanline);
+        float noise = (rand(uv + vec2(u_time, u_time * 0.5)) - 0.5) * 0.04;
+        color += vec3(noise);
 
-    <!-- HUD Estático -->
-    <div class="absolute bottom-6 left-6 z-50 pointer-events-none">
-        <div class="flex items-center gap-2 mb-1">
-            <div class="w-1 h-4 bg-yellow-500"></div>
-            <span class="text-[10px] tracking-[0.3em] font-bold">SGX_SONIC_V6</span>
-        </div>
-        <div class="text-[9px] opacity-30" id="status-text">SYSTEM: STANDBY</div>
-    </div>
+        color *= u_bright;
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
 
-    <!-- Pantalla de Inicio -->
-    <div id="boot-screen" class="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black">
-        <div onclick="startEngine()" class="cursor-pointer group flex flex-col items-center gap-6">
-            <div class="w-24 h-24 rounded-full border-2 border-yellow-500 flex items-center justify-center text-yellow-500 group-hover:bg-yellow-500 group-hover:text-black transition-all">
-                <i class="fa-solid fa-bolt text-4xl"></i>
-            </div>
-            <span class="text-yellow-500 tracking-[0.6em] text-xs font-bold animate-pulse">INIT_SGX_CORE</span>
-        </div>
-    </div>
+    const createShader = (gl, type, source) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Error compilando shader:', gl.getShaderInfoLog(shader));
+      }
+      return shader;
+    };
 
-    <!-- Contenedor Principal -->
-    <div class="w-full h-full flex items-center justify-center">
-        <div id="canvas-wrapper" style="width: 90vw; height: 60vh;">
-            <canvas id="glCanvas"></canvas>
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,0,1, 1,-1,1,1, -1,1,0,0, -1,1,0,0, 1,-1,1,1, 1,1,1,0]), gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(program, "a_position");
+    const texLoc = gl.getAttribLocation(program, "a_texCoord");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(texLoc);
+    gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, 16, 8);
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    const locs = {
+      time: gl.getUniformLocation(program, "u_time"),
+      glitch: gl.getUniformLocation(program, "u_glitch"),
+      distort: gl.getUniformLocation(program, "u_distort"),
+      liquify: gl.getUniformLocation(program, "u_liquify"),
+      cycle: gl.getUniformLocation(program, "u_cycle"),
+      bright: gl.getUniformLocation(program, "u_bright"),
+    };
+
+    const render = (time) => {
+      // Audio Math
+      if (isAudioActive && analyserRef.current) {
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+        const bass = dataArrayRef.current.slice(0, 6).reduce((a, b) => a + b, 0) / 6 / 255;
+        const mid = dataArrayRef.current.slice(6, 24).reduce((a, b) => a + b, 0) / 18 / 255;
+        const high = dataArrayRef.current.slice(24, 60).reduce((a, b) => a + b, 0) / 36 / 255;
+
+        modulatedParams.current = {
+          glitch: params.glitch + (bass * 150), 
+          distort: params.distort + (mid * 100),
+          liquify: params.liquify + (high * 180),
+          cycleSpeed: params.cycleSpeed + (bass * 40),
+          brightness: params.brightness + (bass * 0.8),
+        };
+      } else {
+        modulatedParams.current = { ...params };
+      }
+
+      // Draw
+      if (video.readyState >= video.HAVE_CURRENT_DATA) {
+        if (!isFrozen || !animationIdRef.current) {
+           gl.bindTexture(gl.TEXTURE_2D, texture);
+           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        }
+        
+        if (canvas.width !== video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+
+        gl.uniform1f(locs.time, time * 0.001);
+        gl.uniform1f(locs.glitch, modulatedParams.current.glitch);
+        gl.uniform1f(locs.distort, modulatedParams.current.distort);
+        gl.uniform1f(locs.liquify, modulatedParams.current.liquify);
+        gl.uniform1f(locs.cycle, modulatedParams.current.cycleSpeed);
+        gl.uniform1f(locs.bright, modulatedParams.current.brightness);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      animationIdRef.current = requestAnimationFrame(render);
+    };
+
+    // Force play if possible
+    video.play().catch(() => console.log("Waiting for user tap to play video"));
+    animationIdRef.current = requestAnimationFrame(render);
+
+    return () => cancelAnimationFrame(animationIdRef.current);
+  }, [isAudioActive, isFrozen, params]);
+
+  // Asegurar reproducción con cualquier toque en pantalla (Bypass Mobile Autoplay Policy)
+  const forceInteraction = () => {
+    if (videoRef.current && videoRef.current.paused) {
+      videoRef.current.play();
+    }
+  };
+
+  const toggleAudio = async () => {
+    if (!isAudioActive) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+        setIsAudioActive(true);
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        if (videoRef.current && videoRef.current.paused) videoRef.current.play();
+      } catch (err) { 
+        alert("Microphone access required for Epic Mode.");
+      }
+    } else {
+      setIsAudioActive(false);
+    }
+  };
+
+  return (
+    <div 
+      className="relative w-full h-screen bg-[#020305] flex items-center justify-center overflow-hidden font-scifi select-none text-[#FDCC0D]"
+      onClick={forceInteraction}
+    >
+      {/* INJECT EXOTIC FONT & CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+        .font-scifi { font-family: 'Orbitron', sans-serif; }
+        .font-tech { font-family: 'Rajdhani', sans-serif; }
+        
+        .sci-fi-panel {
+            clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+        }
+        .sci-fi-btn {
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .cyber-range {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        .cyber-range::-webkit-slider-runnable-track {
+            height: 4px;
+            background: rgba(50, 82, 123, 0.4);
+            border-radius: 2px;
+        }
+        .cyber-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 8px;
+            background: #FDCC0D;
+            margin-top: -7px;
+            box-shadow: 0 0 10px #FDCC0D;
+            cursor: pointer;
+            clip-path: polygon(0 0, 100% 20%, 100% 100%, 0 80%);
+            transition: transform 0.1s;
+        }
+        .cyber-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        
+        .bg-rotating-grid {
+            background-size: 50px 50px;
+            background-image: 
+              linear-gradient(to right, rgba(50, 82, 123, 0.1) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(50, 82, 123, 0.1) 1px, transparent 1px);
+            animation: rotateGrid 100s linear infinite;
+        }
+        @keyframes rotateGrid {
+            0% { transform: scale(2) rotate(0deg); }
+            100% { transform: scale(2) rotate(360deg); }
+        }
+        
+        .hud-bracket {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: #FDCC0D;
+            border-style: solid;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+        }
+        .canvas-container:hover .hud-bracket {
+            width: 40px; height: 40px; opacity: 1;
+            box-shadow: 0 0 20px rgba(253, 204, 13, 0.4);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 3px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(50, 82, 123, 0.1); }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #FDCC0D; }
+      `}} />
+
+      {/* ROTATING HOLOGRAPHIC GRID */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -inset-[50%] bg-rotating-grid origin-center opacity-70"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#020305_85%)]"></div>
+      </div>
+
+      {/* MAIN VISUALIZER FRAME (EXOTIC TARGETING SYSTEM) */}
+      <div 
+        style={{ 
+          width: `${params.canvasScale}%`, 
+          height: `calc(${params.canvasScale}% * 0.56)`,
+          maxHeight: '80vh'
+        }}
+        className="relative z-10 flex items-center justify-center canvas-container group"
+      >
+        {/* CORNER BRACKETS (Targeting HUD) */}
+        <div className="hud-bracket border-t-2 border-l-2 -top-2 -left-2"></div>
+        <div className="hud-bracket border-t-2 border-r-2 -top-2 -right-2"></div>
+        <div className="hud-bracket border-b-2 border-l-2 -bottom-2 -left-2"></div>
+        <div className="hud-bracket border-b-2 border-r-2 -bottom-2 -right-2"></div>
+
+        {/* CANVAS WRAPPER */}
+        <div className={`w-full h-full relative sci-fi-panel overflow-hidden border-2 border-[#32527B]/60 bg-black/80 backdrop-blur-md transition-all duration-500 ${isAudioActive ? 'shadow-[0_0_80px_rgba(253,204,13,0.15)]' : 'shadow-[0_0_50px_rgba(50,82,123,0.3)]'}`}>
             
-            <!-- Barras Reactivas en Pantalla -->
-            <div id="audio-meter" class="absolute bottom-4 left-4 flex gap-1 items-end h-12 opacity-0 transition-opacity">
-                <!-- Barras generadas por JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Botón Toggle Panel -->
-    <button onclick="togglePanel()" class="absolute top-6 right-6 z-[110] w-12 h-12 rounded-full bg-black/50 border border-yellow-500/30 flex items-center justify-center text-yellow-500 backdrop-blur-md">
-        <i class="fa-solid fa-sliders" id="gear-icon"></i>
-    </button>
-
-    <!-- Panel de Control -->
-    <div id="control-panel">
-        <div class="flex items-center justify-between mb-8 border-b border-yellow-500/20 pb-4">
-            <h2 class="text-yellow-500 font-black text-xl tracking-tighter">CORE_SETTINGS</h2>
-            <div id="mic-led" class="led"></div>
-        </div>
-
-        <div class="space-y-8">
-            <!-- MODO ÉPICO -->
-            <div class="space-y-2">
-                <button id="audio-btn" onclick="toggleAudio()" class="w-full py-4 border-2 border-yellow-500/40 text-yellow-500 font-bold flex items-center justify-center gap-3 transition-all active:scale-95">
-                    <i class="fa-solid fa-microphone-lines"></i> MODO ÉPICO
-                </button>
-                <div class="text-[8px] text-center opacity-30">REQUIERE ACCESO A MICRÓFONO</div>
-            </div>
-
-            <!-- MODO PHONE -->
-            <div class="space-y-2">
-                <button onclick="toggleFreeze()" id="freeze-btn" class="w-full py-3 bg-white/5 border border-white/10 text-white/40 text-[10px] tracking-widest uppercase">
-                    MODO: STREAMING
-                </button>
-            </div>
-
-            <!-- Controles Manuales -->
-            <div class="space-y-6">
-                <div class="slider-item">
-                    <div class="hud-label"><span>GLITCH</span><span id="v-glitch">15</span></div>
-                    <input type="range" id="c-glitch" min="0" max="100" value="15">
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover opacity-100" />
+            
+            {/* INNER HUD OVERLAY */}
+            <div className="absolute top-4 left-5 flex flex-col gap-1 opacity-90 pointer-events-none">
+                <div className="flex items-center gap-2">
+                    <Crosshair size={18} className={isAudioActive ? "text-red-500 animate-spin-slow" : "text-[#FDCC0D]"} />
+                    <span className="text-sm font-black tracking-[0.4em] uppercase text-white drop-shadow-[0_0_8px_#32527B]">
+                        NCANDELA SGX VISUALIZER
+                    </span>
                 </div>
-                <div class="slider-item">
-                    <div class="hud-label"><span>LIQUIFY</span><span id="v-liquify">30</span></div>
-                    <input type="range" id="c-liquify" min="0" max="100" value="30">
+                <span className="font-tech text-[#FDCC0D] text-[10px] tracking-widest pl-7">SYS.CORE // RENDER ACTIVE</span>
+            </div>
+            
+            <div className="absolute bottom-4 right-5 flex items-center gap-3 opacity-80 pointer-events-none bg-black/40 px-3 py-1 border border-[#32527B]/50 rounded-full backdrop-blur-sm">
+                <span className="font-tech text-[10px] tracking-widest text-white">SYNC: <span className="text-[#FDCC0D] font-bold">{syncRate}%</span></span>
+                <Wifi size={12} className={syncRate > 97 ? "text-green-400" : "text-[#FDCC0D]"} />
+            </div>
+
+            {/* REACTIVE AUDIO BARS */}
+            {isAudioActive && (
+            <div className="absolute bottom-0 left-0 w-full flex items-end gap-1 h-28 px-8 opacity-40 pointer-events-none">
+                {[...Array(40)].map((_, i) => (
+                <div 
+                    key={i} 
+                    className="flex-1 bg-gradient-to-t from-[#B87333] via-[#FDCC0D] to-white" 
+                    style={{ 
+                        height: `${Math.max(2, Math.random() * 100)}%`, 
+                        transition: 'height 0.05s ease',
+                        boxShadow: '0 0 15px rgba(253, 204, 13, 0.5)'
+                    }} 
+                />
+                ))}
+            </div>
+            )}
+        </div>
+      </div>
+
+      {/* FLOATING EXOTIC CONTROL PANEL */}
+      <div className={`absolute top-1/2 -translate-y-1/2 right-4 h-[85vh] w-[300px] md:w-[340px] z-[105] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${showControls ? 'translate-x-0' : 'translate-x-[110%]'}`}>
+        
+        {/* Toggle Button */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); setShowControls(!showControls); }}
+          className="absolute top-1/2 -left-10 -translate-y-1/2 w-10 h-32 sci-fi-panel bg-[#0a111a]/90 backdrop-blur-xl border border-[#32527B] flex items-center justify-center text-[#FDCC0D] hover:bg-[#32527B]/60 hover:shadow-[0_0_20px_#FDCC0D] transition-all cursor-pointer"
+        >
+          {showControls ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+        </button>
+
+        {/* Panel Content */}
+        <div className="h-full sci-fi-panel bg-[#0a111a]/90 backdrop-blur-2xl border-l-2 border-t-2 border-[#32527B] p-6 flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.9)] relative" onClick={(e) => e.stopPropagation()}>
+            
+            {/* DECORATIVE ACCENTS */}
+            <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl from-[#32527B]/40 to-transparent pointer-events-none"></div>
+            <div className="absolute bottom-0 right-0 w-24 h-1 bg-[#FDCC0D] shadow-[0_0_10px_#FDCC0D]"></div>
+
+            {/* HEADER */}
+            <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 sci-fi-btn bg-[#32527B]/20 border border-[#FDCC0D] flex items-center justify-center flex-shrink-0 shadow-[0_0_15px_rgba(253,204,13,0.3)]">
+                    <Cpu size={22} className="text-[#FDCC0D]" />
                 </div>
-                <div class="slider-item">
-                    <div class="hud-label"><span>DISTORT</span><span id="v-distort">10</span></div>
-                    <input type="range" id="c-distort" min="0" max="100" value="10">
-                </div>
-                <div class="slider-item">
-                    <div class="hud-label"><span>HUE_SPEED</span><span id="v-cycle">8</span></div>
-                    <input type="range" id="c-cycle" min="0" max="40" value="8">
-                </div>
-                <div class="slider-item">
-                    <div class="hud-label"><span>CANVAS_SCALE</span><span id="v-scale">90</span></div>
-                    <input type="range" id="c-scale" min="20" max="100" value="90">
+                <div className="flex flex-col mt-1">
+                    <span className="font-tech text-[10px] text-[#32527B] tracking-[0.3em] font-bold">CONTROL OVERRIDE</span>
+                    <h2 className="text-sm font-black tracking-widest uppercase text-white">ENGINE_V6.5</h2>
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className={`w-1.5 h-1.5 rounded-sm ${isAudioActive ? 'bg-red-500 shadow-[0_0_10px_red] animate-pulse' : 'bg-green-500 shadow-[0_0_10px_green]'}`}></div>
+                        <span className="font-tech text-[10px] text-white/50 uppercase tracking-widest">{isAudioActive ? 'AUDIO_SYNCED' : 'STANDBY'}</span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="mt-12 text-[9px] text-white/20 border-t border-white/5 pt-4">
-            CORE: WEBGL_2.0<br>
-            REACTIVITY: FFT_ANALYZER_ACTIVE
-        </div>
-    </div>
-
-    <!-- Video Oculto -->
-    <video id="videoElement" src="https://video.wixstatic.com/video/fe81a7_1d713a63efdd4b0fa77319dbf921a9bc/file" loop muted playsinline crossorigin="anonymous" style="display:none"></video>
-
-    <!-- SHADERS -->
-    <script id="vs" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
-        varying vec2 v_texCoord;
-        void main() {
-            gl_Position = vec4(a_position, 0, 1);
-            v_texCoord = a_texCoord;
-        }
-    </script>
-
-    <script id="fs" type="x-shader/x-fragment">
-        precision highp float;
-        uniform sampler2D u_image;
-        uniform float u_time;
-        uniform float u_glitch;
-        uniform float u_distort;
-        uniform float u_liquify;
-        uniform float u_cycle;
-        varying vec2 v_texCoord;
-
-        float rand(vec2 co) {
-            return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
-        }
-
-        void main() {
-            vec2 uv = v_texCoord;
-            
-            // Liquify Effect
-            float lVal = u_liquify * 0.0025;
-            uv.x += sin(uv.y * 10.0 + u_time * 2.0) * lVal;
-            uv.y += cos(uv.x * 10.0 + u_time * 1.5) * lVal;
-
-            // Wave Distortion
-            uv.y += sin(uv.x * 20.0 + u_time * 4.0) * (u_distort * 0.004);
-
-            // Glitch Logic
-            vec2 offsetR = vec2(0.0);
-            vec2 offsetB = vec2(0.0);
-            float gTrigger = step(0.96 - (u_glitch * 0.007), rand(vec2(u_time, 1.0)));
-            
-            if(gTrigger > 0.0) {
-                float noise = (rand(vec2(floor(uv.y * 10.0), u_time)) - 0.5) * (u_glitch * 0.04);
-                uv.x += noise;
-                offsetR.x = (u_glitch * 0.02);
-                offsetB.x = -(u_glitch * 0.02);
-            }
-
-            vec3 color;
-            color.r = texture2D(u_image, uv + offsetR).r;
-            color.g = texture2D(u_image, uv).g;
-            color.b = texture2D(u_image, uv + offsetB).b;
-
-            // Hue Shift
-            if(u_cycle > 0.0) {
-                float hue = u_time * u_cycle * 0.2;
-                float s = sin(hue); float c = cos(hue);
-                vec3 w = vec3(0.3333);
-                float d = dot(color, w);
-                vec3 diff = color - d;
-                color = d + diff * c + cross(w, diff) * s;
-            }
-
-            gl_FragColor = vec4(color, 1.0);
-        }
-    </script>
-
-    <script>
-        let gl, program, texture, video, audioCtx, analyser, dataArray;
-        let isAudioActive = false;
-        let isFrozen = false;
-        let currentParams = { glitch: 15, liquify: 30, distort: 10, cycle: 8 };
-        let modulated = { ...currentParams };
-
-        const canvas = document.getElementById('glCanvas');
-        const wrapper = document.getElementById('canvas-wrapper');
-
-        function startEngine() {
-            document.getElementById('boot-screen').style.opacity = '0';
-            setTimeout(() => document.getElementById('boot-screen').remove(), 500);
-            
-            video = document.getElementById('videoElement');
-            video.play();
-            
-            initGL();
-            
-            // Crear barras de visualización una vez
-            const meter = document.getElementById('audio-meter');
-            for(let i=0; i<16; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'w-1 bg-yellow-500 transition-all duration-75';
-                bar.style.height = '2px';
-                meter.appendChild(bar);
-            }
-
-            requestAnimationFrame(render);
-            document.getElementById('status-text').innerText = "SYSTEM: ACTIVE";
-        }
-
-        function initGL() {
-            gl = canvas.getContext('webgl');
-            const vs = createShader(gl, gl.VERTEX_SHADER, document.getElementById('vs').text);
-            const fs = createShader(gl, gl.FRAGMENT_SHADER, document.getElementById('fs').text);
-            
-            program = gl.createProgram();
-            gl.attachShader(program, vs);
-            gl.attachShader(program, fs);
-            gl.linkProgram(program);
-            gl.useProgram(program);
-
-            const buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-                -1, -1, 0, 1,  1, -1, 1, 1,  -1, 1, 0, 0,
-                -1, 1, 0, 0,   1, -1, 1, 1,  1, 1, 1, 0
-            ]), gl.STATIC_DRAW);
-
-            const pos = gl.getAttribLocation(program, "a_position");
-            const tex = gl.getAttribLocation(program, "a_texCoord");
-            gl.enableVertexAttribArray(pos);
-            gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(tex);
-            gl.vertexAttribPointer(tex, 2, gl.FLOAT, false, 16, 8);
-
-            texture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        }
-
-        function createShader(gl, type, source) {
-            const s = gl.createShader(type);
-            gl.shaderSource(s, source);
-            gl.compileShader(s);
-            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-                console.error(gl.getShaderInfoLog(s));
-            }
-            return s;
-        }
-
-        async function toggleAudio() {
-            const btn = document.getElementById('audio-btn');
-            const led = document.getElementById('mic-led');
-            const meter = document.getElementById('audio-meter');
-
-            if (!isAudioActive) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const source = audioCtx.createMediaStreamSource(stream);
-                    
-                    analyser = audioCtx.createAnalyser();
-                    analyser.fftSize = 256;
-                    source.connect(analyser);
-                    dataArray = new Uint8Array(analyser.frequencyBinCount);
-                    
-                    isAudioActive = true;
-                    btn.classList.add('bg-red-500/20', 'border-red-500', 'text-red-500', 'btn-epic-active');
-                    btn.innerHTML = '<i class="fa-solid fa-volume-high"></i> MODO ÉPICO ON';
-                    led.classList.add('led-active');
-                    meter.style.opacity = '0.7';
-                    
-                    if (audioCtx.state === 'suspended') await audioCtx.resume();
-                    
-                } catch (e) { 
-                    alert("Error: No se pudo acceder al micrófono.");
-                    console.error(e); 
-                }
-            } else {
-                isAudioActive = false;
-                btn.classList.remove('bg-red-500/20', 'border-red-500', 'text-red-500', 'btn-epic-active');
-                btn.innerHTML = '<i class="fa-solid fa-microphone-lines"></i> MODO ÉPICO';
-                led.classList.remove('led-active');
-                meter.style.opacity = '0';
-            }
-        }
-
-        function toggleFreeze() {
-            isFrozen = !isFrozen;
-            const btn = document.getElementById('freeze-btn');
-            btn.innerText = isFrozen ? 'MODO: ESTÁTICO (PHONE)' : 'MODO: STREAMING';
-            btn.style.color = isFrozen ? '#FDCC0D' : 'rgba(255,255,255,0.4)';
-        }
-
-        function togglePanel() {
-            document.getElementById('control-panel').classList.toggle('open');
-            document.getElementById('gear-icon').classList.toggle('rotate-90');
-        }
-
-        function render(time) {
-            if (isAudioActive && analyser) {
-                analyser.getByteFrequencyData(dataArray);
+            <div className="flex-1 space-y-7 overflow-y-auto pr-3 custom-scroll">
                 
-                // Analizar rangos: Bajos (0-5), Medios (5-20), Agudos (20-50)
-                let bassSum = 0, midSum = 0, highSum = 0;
-                for(let i=0; i<5; i++) bassSum += dataArray[i];
-                for(let i=5; i<20; i++) midSum += dataArray[i];
-                for(let i=20; i<50; i++) highSum += dataArray[i];
+                {/* ACTION BUTTONS */}
+                <div className="grid grid-cols-2 gap-4">
+                    <button 
+                        onClick={toggleAudio}
+                        className={`sci-fi-btn p-3 border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isAudioActive ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[inset_0_0_20px_rgba(255,0,0,0.2),0_0_15px_rgba(255,0,0,0.4)]' : 'bg-[#32527B]/10 border-[#32527B] text-[#32527B] hover:border-[#FDCC0D] hover:text-[#FDCC0D]'}`}
+                    >
+                        <Volume2 size={18} />
+                        <span className="font-tech text-[10px] font-bold uppercase tracking-[0.2em]">Epic Mod</span>
+                    </button>
+                    <button 
+                        onClick={() => setIsFrozen(!isFrozen)}
+                        className={`sci-fi-btn p-3 border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isFrozen ? 'bg-[#FDCC0D]/20 border-[#FDCC0D] text-[#FDCC0D] shadow-[0_0_15px_rgba(253,204,13,0.3)]' : 'bg-[#32527B]/10 border-[#32527B] text-[#32527B] hover:border-white hover:text-white'}`}
+                    >
+                        {isFrozen ? <Pause size={18} /> : <Play size={18} />}
+                        <span className="font-tech text-[10px] font-bold uppercase tracking-[0.2em]">Freeze</span>
+                    </button>
+                </div>
 
-                const b = (bassSum / 5) / 255;
-                const m = (midSum / 15) / 255;
-                const h = (highSum / 30) / 255;
+                {/* MODULATORS */}
+                <div className="space-y-6 pt-2">
+                    <div className="font-tech text-[10px] text-[#32527B] font-bold tracking-[0.3em] border-b border-[#32527B]/30 pb-2 mb-4">
+                        // PARAMETERS
+                    </div>
+                    
+                    <ControlSlider label="Chroma_Glitch" icon={<Zap size={14}/>} value={params.glitch} onChange={(v) => updateParam('glitch', v)} active={isAudioActive} />
+                    <ControlSlider label="Matter_Warp" icon={<Droplets size={14}/>} value={params.liquify} onChange={(v) => updateParam('liquify', v)} active={isAudioActive} />
+                    <ControlSlider label="Phase_Distort" icon={<Maximize2 size={14}/>} value={params.distort} onChange={(v) => updateParam('distort', v)} active={isAudioActive} />
+                    <ControlSlider label="Hue_Velocity" icon={<Palette size={14}/>} value={params.cycleSpeed} onChange={(v) => updateParam('cycleSpeed', v)} active={isAudioActive} />
+                    <ControlSlider label="Frame_Scale" icon={<Monitor size={14}/>} value={params.canvasScale} onChange={(v) => updateParam('canvasScale', v)} min={30} max={100} />
+                    
+                    <div className="pt-3 border-t border-[#32527B]/30">
+                        <label className="flex items-center gap-2 text-white/70 text-[10px] uppercase tracking-widest font-bold mb-3 font-tech">
+                            <Sun size={14} className="text-[#FDCC0D]"/> Exposure_Lvl
+                        </label>
+                        <input 
+                            type="range" min="0.5" max="3" step="0.1" value={params.brightness} 
+                            onChange={(e) => updateParam('brightness', e.target.value)}
+                            className="cyber-range"
+                        />
+                    </div>
+                </div>
+            </div>
 
-                // Modulación agresiva
-                modulated.glitch = currentParams.glitch + (b * 120);
-                modulated.liquify = currentParams.liquify + (h * 150);
-                modulated.distort = currentParams.distort + (m * 80);
-                modulated.cycle = currentParams.cycle + (b * 40);
+            {/* FOOTER */}
+            <div className="mt-4 pt-4 text-center">
+                <p className="font-tech text-[11px] text-[#32527B] font-bold tracking-[0.4em] uppercase">Spatialgineers LLC</p>
+            </div>
+        </div>
+      </div>
 
-                // Actualizar barras del meter
-                const bars = document.getElementById('audio-meter').children;
-                for(let i=0; i<bars.length; i++) {
-                    bars[i].style.height = Math.max(2, (dataArray[i*2] / 255) * 48) + 'px';
-                }
-            } else {
-                modulated = { ...currentParams };
-            }
+      {/* HIDDEN VIDEO SOURCE */}
+      <video 
+        ref={videoRef}
+        src="https://video.wixstatic.com/video/fe81a7_1d713a63efdd4b0fa77319dbf921a9bc/file"
+        autoPlay
+        loop 
+        muted 
+        playsInline 
+        crossOrigin="anonymous" 
+        className="hidden"
+      />
+    </div>
+  );
+};
 
-            if (video.readyState >= video.HAVE_CURRENT_DATA) {
-                if (!isFrozen) {
-                    gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-                }
+// Componente Slider Estilo Cyberpunk
+const ControlSlider = ({ label, icon, value, onChange, active, min = 0, max = 100 }) => (
+  <div className="group space-y-2">
+    <div className="flex justify-between items-center">
+      <label className="font-tech flex items-center gap-2 text-white/70 text-[11px] uppercase tracking-[0.1em] font-bold group-hover:text-white transition-colors">
+        <span className={active ? "text-red-400" : "text-[#32527B]"}>{icon}</span> {label}
+      </label>
+      <div className="flex items-center gap-2 bg-[#020305] px-2 py-0.5 sci-fi-btn border border-[#32527B]/50">
+          {active && <div className="w-1 h-1 bg-red-500 shadow-[0_0_5px_red]"></div>}
+          <span className="font-tech text-[12px] text-[#FDCC0D] font-black">{Math.round(value)}</span>
+      </div>
+    </div>
+    <div className="relative flex items-center">
+      <input 
+        type="range" min={min} max={max} value={value} 
+        onChange={(e) => onChange(e.target.value)}
+        className="cyber-range"
+      />
+    </div>
+  </div>
+);
 
-                if (canvas.width !== video.videoWidth) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    gl.viewport(0, 0, canvas.width, canvas.height);
-                }
+export default App;
 
-                gl.uniform1f(gl.getUniformLocation(program, "u_time"), time * 0.001);
-                gl.uniform1f(gl.getUniformLocation(program, "u_glitch"), modulated.glitch);
-                gl.uniform1f(gl.getUniformLocation(program, "u_distort"), modulated.distort);
-                gl.uniform1f(gl.getUniformLocation(program, "u_liquify"), modulated.liquify);
-                gl.uniform1f(gl.getUniformLocation(program, "u_cycle"), modulated.cycle);
-
-                gl.drawArrays(gl.TRIANGLES, 0, 6);
-            }
-
-            requestAnimationFrame(render);
-        }
-
-        // Listeners de Sliders
-        const inputs = ['glitch', 'liquify', 'distort', 'cycle', 'scale'];
-        inputs.forEach(id => {
-            const el = document.getElementById('c-'+id);
-            el.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                if(id === 'scale') {
-                    wrapper.style.width = val + 'vw';
-                    wrapper.style.height = (val * 0.6) + 'vh';
-                } else {
-                    currentParams[id] = val;
-                }
-                document.getElementById('v-'+id).innerText = Math.round(val);
-            });
-        });
-    </script>
-</body>
-</html>
 

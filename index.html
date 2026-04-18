@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,10 +12,10 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Google Fonts: Orbitron & Share Tech Mono -->
+    <!-- Google Fonts: Orbitron, Share Tech Mono y Syncopate (Exótica/Bold) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -34,13 +35,11 @@
             -webkit-user-select: none;
         }
 
-        .font-mono-tech {
-            font-family: 'Share Tech Mono', monospace;
-        }
+        .font-mono-tech { font-family: 'Share Tech Mono', monospace; }
+        .font-exotic { font-family: 'Syncopate', sans-serif; }
 
         /* --- ESTILOS EXÓTICOS Y HOLOGRÁFICOS --- */
         
-        /* Panel Holográfico Flotante (Minimalista) */
         .holo-panel {
             background: linear-gradient(135deg, rgba(5, 8, 12, 0.85) 0%, rgba(50, 82, 123, 0.4) 100%);
             backdrop-filter: blur(20px);
@@ -80,15 +79,12 @@
             box-shadow: inset 0 0 20px rgba(184, 115, 51, 0.2), 0 0 20px rgba(184, 115, 51, 0.4);
         }
 
-        /* Sliders Láser de Alta Precisión */
         .cyber-range {
             -webkit-appearance: none;
             background: transparent;
             width: 100%;
         }
-        .cyber-range:focus {
-            outline: none;
-        }
+        .cyber-range:focus { outline: none; }
         .cyber-range::-webkit-slider-runnable-track {
             height: 1px;
             background: rgba(253, 204, 13, 0.3);
@@ -109,7 +105,6 @@
             background: #fff;
         }
 
-        /* Animación del Menú Overlay */
         #hologram-menu {
             opacity: 0;
             pointer-events: none;
@@ -122,31 +117,43 @@
             transform: translate(-50%, -50%) scale(1);
         }
 
-        /* Botón de Toggle Flotante Central */
-        .float-toggle {
-            animation: pulseGlow 3s infinite alternate;
-        }
+        .float-toggle { animation: pulseGlow 3s infinite alternate; }
         @keyframes pulseGlow {
             0% { box-shadow: 0 0 10px rgba(50, 82, 123, 0.5); border-color: rgba(50, 82, 123, 0.8); }
             100% { box-shadow: 0 0 25px rgba(253, 204, 13, 0.6); border-color: rgba(253, 204, 13, 0.8); }
         }
 
-        /* Efectos de Texto Glow */
-        .text-glow-yellow { text-shadow: 0 0 15px rgba(253, 204, 13, 0.9); }
+        .text-glow-yellow { text-shadow: 0 0 12px rgba(253, 204, 13, 0.8); }
         
-        /* Retícula de Enfoque */
         .reticle-corner {
             position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 1px solid rgba(253, 204, 13, 0.3);
+            width: 20px;
+            height: 20px;
+            border: 1px solid rgba(253, 204, 13, 0.5);
             transition: all 0.3s ease;
         }
         
-        /* Ocultar Scrollbar */
         ::-webkit-scrollbar { width: 2px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         ::-webkit-scrollbar-thumb { background: rgba(50, 82, 123, 0.5); }
+
+        /* Estilos del Overlay Personalizado (Texto Exotic) */
+        .exotic-text-overlay {
+            color: transparent;
+            -webkit-text-stroke: 1.5px rgba(253, 204, 13, 0.9);
+            background: linear-gradient(180deg, #FDCC0D 0%, #B87333 100%);
+            -webkit-background-clip: text;
+            filter: drop-shadow(0 0 25px rgba(184, 115, 51, 0.8));
+        }
+
+        /* Animación suave de respiración para el logo/texto */
+        .animate-hologram-breathe {
+            animation: holoBreathe 4s ease-in-out infinite;
+        }
+        @keyframes holoBreathe {
+            0%, 100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 20px rgba(253,204,13,0.5)); }
+            50% { transform: scale(1.02) translateY(-5px); filter: drop-shadow(0 0 35px rgba(253,204,13,0.9)); }
+        }
     </style>
 </head>
 <body onclick="wakeUpMedia()">
@@ -159,6 +166,9 @@
             <div class="reticle-corner top-0 right-0 border-l-0 border-b-0"></div>
             <div class="reticle-corner bottom-0 left-0 border-r-0 border-t-0"></div>
             <div class="reticle-corner bottom-0 right-0 border-l-0 border-t-0"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 border border-white/10 rounded-full flex items-center justify-center">
+                <div class="w-1 h-1 bg-white/20 rounded-full"></div>
+            </div>
         </div>
 
         <canvas id="glCanvas" class="w-full h-full object-cover opacity-100 transition-opacity duration-1000"></canvas>
@@ -168,142 +178,167 @@
         <div class="absolute inset-0 pointer-events-none opacity-[0.03] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] z-10"></div>
     </div>
 
+    <!-- CAPA OVERLAY CUSTOM (TEXTO Y LOGO PNG FRENTE AL FUEGO) -->
+    <div class="fixed inset-0 z-15 pointer-events-none flex flex-col items-center justify-center gap-6 p-10">
+        <!-- Contenedor del Logo PNG -->
+        <img id="custom-logo" src="" alt="" class="hidden max-w-[70vw] max-h-[40vh] object-contain animate-hologram-breathe" />
+        
+        <!-- Contenedor del Texto Exótico -->
+        <h2 id="custom-text" class="hidden text-4xl md:text-7xl lg:text-8xl font-exotic font-bold tracking-[0.2em] text-center uppercase exotic-text-overlay animate-hologram-breathe"></h2>
+    </div>
+
     <!-- CAPA HUD PRINCIPAL -->
     <div class="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 md:p-10">
-        
-        <!-- HEADER HUD: LOGO COOL + NOMBRE -->
+        <!-- HEADER HUD -->
         <div class="flex justify-between items-start">
-            <div class="flex items-center gap-4 md:gap-6 bg-black/20 backdrop-blur-sm p-3 md:p-4 rounded-xl border border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-                
-                <!-- EL LOGO EXÓTICO (Rayo + Precisión) -->
-                <div class="relative w-12 h-12 md:w-16 md:h-16 flex items-center justify-center shrink-0">
-                    <i class="fa-solid fa-crosshairs absolute text-[#32527B] text-4xl md:text-5xl animate-[spin_8s_linear_infinite] opacity-80 drop-shadow-[0_0_5px_rgba(50,82,123,0.8)]"></i>
-                    <i class="fa-solid fa-bolt text-[#FDCC0D] text-xl md:text-2xl z-10 text-glow-yellow"></i>
+            <div class="flex flex-col">
+                <div class="flex items-center gap-3 mb-1">
+                    <i class="fa-solid fa-circle-notch text-[#FDCC0D] text-sm animate-[spin_8s_linear_infinite]"></i>
+                    <span class="font-mono-tech text-[10px] text-[#32527B] tracking-[0.3em] font-bold">SYNC: ACTIVE</span>
                 </div>
-                
-                <!-- NOMBRE Y ESTADO -->
-                <div class="flex flex-col mt-1">
-                    <div class="flex items-center gap-2 mb-1">
-                        <div id="main-status-dot" class="w-1.5 h-1.5 rounded-full bg-[#32527B]"></div>
-                        <span class="font-mono-tech text-[8px] md:text-[10px] text-white/50 tracking-[0.3em] font-bold uppercase" id="main-status-text">
-                            SYSTEM STANDBY
-                        </span>
-                    </div>
-                    <h1 class="text-lg md:text-2xl font-black tracking-[0.15em] text-white text-glow-yellow leading-none">
-                        NCANDELA SGX VISUALIZER
-                    </h1>
-                </div>
+                <h1 class="text-xl md:text-3xl font-black tracking-[0.15em] text-white text-glow-yellow leading-none">
+                    NCANDELA SGX VISUALIZER
+                </h1>
             </div>
             
-            <!-- DECORACIÓN TOP RIGHT (Líneas tecnológicas) -->
-            <div class="hidden md:flex gap-2 opacity-40">
-                <div class="w-2 h-8 bg-[#32527B] skew-x-[-20deg]"></div>
-                <div class="w-6 h-8 bg-[#FDCC0D] skew-x-[-20deg]"></div>
-                <div class="w-16 h-8 bg-[#32527B]/30 skew-x-[-20deg]"></div>
+            <!-- DECORACIÓN TOP RIGHT -->
+            <div class="hidden md:flex flex-col items-end opacity-60 font-mono-tech text-[8px] text-[#32527B] tracking-[0.2em] text-right">
+                <p>DATA_STREAM: OPTIMAL</p>
+                <p>RENDER_ENGINE: WEBGL</p>
+                <div class="flex gap-1 mt-2">
+                    <div class="w-8 h-[1px] bg-[#32527B]"></div>
+                    <div class="w-2 h-[1px] bg-[#FDCC0D]"></div>
+                </div>
             </div>
         </div>
 
         <!-- FOOTER HUD -->
         <div class="flex justify-between items-end w-full relative">
-            
-            <!-- BARRAS AUDIO REACTIVAS (Absoluto Centro Abajo) -->
             <div id="hud-audio-bars" class="absolute left-1/2 bottom-0 transform -translate-x-1/2 flex items-end gap-[2px] md:gap-[4px] h-24 w-[60%] max-w-2xl opacity-0 transition-opacity duration-500">
                 <!-- Generado por JS -->
             </div>
 
-            <!-- ESPACIO VACÍO IZQUIERDA -->
             <div class="w-32"></div>
 
-            <!-- POWERED BY SPATIALGINEERS (Reemplazo del Sync Rate) -->
-            <div class="flex items-center gap-3 bg-black/40 backdrop-blur-sm px-5 py-3 border border-[#32527B]/30 rounded-lg shadow-[0_0_20px_rgba(50,82,123,0.2)]">
+            <div class="flex items-center gap-3 bg-black/40 backdrop-blur-sm px-4 py-2 border border-white/5 rounded-l-full">
                 <div class="flex flex-col items-end">
-                    <span class="text-[7px] md:text-[8px] font-mono-tech text-white/50 tracking-[0.3em] uppercase mb-0.5">
-                        Powered By
-                    </span>
-                    <span class="text-xs md:text-sm tracking-[0.1em] text-[#FDCC0D] font-black text-glow-yellow">
+                    <span class="text-[7px] md:text-[8px] font-mono-tech text-white/50 tracking-[0.3em] uppercase">Powered By</span>
+                    <span class="text-xs md:text-sm tracking-[0.1em] text-[#FDCC0D] font-bold text-glow-yellow">
                         SPATIALGINEERS
                     </span>
                 </div>
-                <i class="fa-solid fa-cube text-[#32527B] text-xl md:text-2xl animate-pulse drop-shadow-[0_0_8px_rgba(50,82,123,0.8)]"></i>
+                <i class="fa-solid fa-cube text-[#32527B] text-xl md:text-2xl animate-pulse drop-shadow-[0_0_5px_rgba(50,82,123,0.8)]"></i>
             </div>
         </div>
     </div>
 
-    <!-- BOTÓN CENTRAL FLOTANTE (ABRIR MENÚ) -->
-    <div class="fixed bottom-12 left-1/2 transform -translate-x-1/2 z-40">
-        <button onclick="toggleMenu()" class="float-toggle w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#05080c]/90 border border-[#32527B] text-white flex items-center justify-center hover:bg-[#FDCC0D] hover:text-black hover:border-[#FDCC0D] transition-all duration-300 backdrop-blur-lg group">
-            <i class="fa-solid fa-sliders text-xl md:text-2xl group-hover:scale-110 transition-transform"></i>
+    <!-- BOTÓN CENTRAL FLOTANTE -->
+    <div class="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-40">
+        <button onclick="toggleMenu()" class="float-toggle w-12 h-12 md:w-14 md:h-14 rounded-full bg-[#05080c]/90 border border-[#32527B] text-white flex items-center justify-center hover:bg-[#FDCC0D] hover:text-black hover:border-[#FDCC0D] transition-all duration-300 backdrop-blur-lg group">
+            <i class="fa-solid fa-sliders text-lg md:text-xl group-hover:scale-110 transition-transform"></i>
         </button>
     </div>
 
     <!-- MENÚ HOLOGRÁFICO (MODAL CENTRAL) -->
-    <div id="hologram-menu" class="fixed top-1/2 left-1/2 z-50 w-[92%] max-w-lg holo-panel p-6 md:p-10 flex flex-col">
+    <div id="hologram-menu" class="fixed top-1/2 left-1/2 z-50 w-[92%] max-w-lg holo-panel p-6 md:p-8 flex flex-col max-h-[90vh]">
         
         <button onclick="toggleMenu()" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[#FDCC0D]/50 hover:text-[#FDCC0D] hover:rotate-90 transition-all duration-300">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
 
-        <div class="flex items-center gap-4 mb-8 border-b border-[#32527B]/30 pb-5">
+        <div class="flex items-center gap-4 mb-6 border-b border-[#32527B]/30 pb-4">
             <i class="fa-brands fa-connectdevelop text-3xl text-[#32527B] drop-shadow-[0_0_8px_rgba(50,82,123,0.8)]"></i>
             <div>
                 <h2 class="text-base md:text-lg font-black tracking-[0.2em] text-white">CORE CONFIG</h2>
+                <div class="flex items-center gap-2 mt-1">
+                    <div id="status-dot" class="w-1.5 h-1.5 bg-[#32527B] rounded-full"></div>
+                    <span id="status-text" class="font-mono-tech text-[10px] text-[#FDCC0D]/70 tracking-widest">AWAITING_AUDIO</span>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 mb-8">
-            <button id="btn-audio" onclick="toggleAudio()" class="holo-btn py-4 px-2 flex flex-col items-center justify-center gap-3 text-[#32527B] group">
-                <i class="fa-solid fa-wave-square text-2xl group-hover:scale-110 transition-transform duration-300"></i>
-                <span class="text-[10px] font-bold tracking-[0.15em]">EPIC MODE</span>
-            </button>
-            <button id="btn-freeze" onclick="toggleFreeze()" class="holo-btn py-4 px-2 flex flex-col items-center justify-center gap-3 text-[#32527B] group">
-                <i id="icon-freeze" class="fa-solid fa-play text-2xl group-hover:scale-110 transition-transform duration-300"></i>
-                <span class="text-[10px] font-bold tracking-[0.15em]">STATIC FRAME</span>
-            </button>
-        </div>
-
-        <div class="space-y-6">
-            <div class="text-[9px] text-[#32527B] font-bold tracking-[0.4em] uppercase mb-4 opacity-70">
-                // NEURAL PARAMETERS
-            </div>
-            
-            <div class="group space-y-2">
-                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
-                    <span><i class="fa-solid fa-bolt text-[#32527B] mr-2"></i> CHROMA_GLITCH</span>
-                    <span id="val-glitch" class="font-mono-tech text-[#FDCC0D] text-xs">15</span>
-                </div>
-                <input type="range" id="c-glitch" min="0" max="100" value="15" class="cyber-range">
+        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6">
+            <!-- Botones de Acción -->
+            <div class="grid grid-cols-2 gap-4">
+                <button id="btn-audio" onclick="toggleAudio()" class="holo-btn py-3 px-2 flex flex-col items-center justify-center gap-2 text-[#32527B] group">
+                    <i class="fa-solid fa-wave-square text-xl group-hover:scale-110 transition-transform duration-300"></i>
+                    <span class="text-[9px] font-bold tracking-[0.15em]">EPIC MODE</span>
+                </button>
+                <button id="btn-freeze" onclick="toggleFreeze()" class="holo-btn py-3 px-2 flex flex-col items-center justify-center gap-2 text-[#32527B] group">
+                    <i id="icon-freeze" class="fa-solid fa-play text-xl group-hover:scale-110 transition-transform duration-300"></i>
+                    <span class="text-[9px] font-bold tracking-[0.15em]">STATIC FRAME</span>
+                </button>
             </div>
 
-            <div class="group space-y-2">
-                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
-                    <span><i class="fa-solid fa-droplet text-[#32527B] mr-2"></i> MATTER_WARP</span>
-                    <span id="val-liquify" class="font-mono-tech text-[#FDCC0D] text-xs">25</span>
+            <!-- INYECTOR DE OVERLAY (Texto y Logo) -->
+            <div class="space-y-4 pt-2 border-t border-[#32527B]/30">
+                <div class="text-[9px] text-[#32527B] font-bold tracking-[0.4em] uppercase opacity-70">
+                    // OVERLAY INJECTOR
                 </div>
-                <input type="range" id="c-liquify" min="0" max="100" value="25" class="cyber-range">
+                
+                <!-- Input de Texto -->
+                <input type="text" id="custom-text-input" placeholder="INTRODUCIR TEXTO HOLOGRÁFICO..." class="w-full bg-[#32527B]/10 border border-[#32527B]/50 text-[#FDCC0D] px-4 py-3 text-[10px] font-mono-tech focus:outline-none focus:border-[#FDCC0D] transition-colors placeholder-[#32527B]/70 uppercase" oninput="updateCustomText(this.value)">
+                
+                <!-- Botones PNG y Limpiar -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="document.getElementById('logo-upload').click()" class="holo-btn py-2 px-2 flex items-center justify-center gap-2 text-[#32527B] hover:text-[#FDCC0D] group">
+                        <i class="fa-solid fa-upload text-sm group-hover:-translate-y-1 transition-transform"></i>
+                        <span class="text-[8px] font-bold tracking-widest">SUBIR PNG</span>
+                    </button>
+                    <button onclick="clearOverlay()" class="holo-btn py-2 px-2 flex items-center justify-center gap-2 text-[#32527B] hover:text-red-400 group">
+                        <i class="fa-solid fa-trash-can text-sm group-hover:scale-110 transition-transform"></i>
+                        <span class="text-[8px] font-bold tracking-widest">LIMPIAR</span>
+                    </button>
+                </div>
+                <!-- Input oculto para el archivo -->
+                <input type="file" id="logo-upload" accept="image/png, image/webp" class="hidden" onchange="handleLogoUpload(event)">
             </div>
 
-            <div class="group space-y-2">
-                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
-                    <span><i class="fa-solid fa-barcode text-[#32527B] mr-2"></i> PHASE_DISTORT</span>
-                    <span id="val-distort" class="font-mono-tech text-[#FDCC0D] text-xs">10</span>
+            <!-- Parámetros Visuales -->
+            <div class="space-y-5 pt-4 border-t border-[#32527B]/30">
+                <div class="text-[9px] text-[#32527B] font-bold tracking-[0.4em] uppercase opacity-70">
+                    // NEURAL PARAMETERS
                 </div>
-                <input type="range" id="c-distort" min="0" max="100" value="10" class="cyber-range">
-            </div>
+                
+                <div class="group space-y-2">
+                    <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                        <span><i class="fa-solid fa-bolt text-[#32527B] mr-2"></i> CHROMA_GLITCH</span>
+                        <span id="val-glitch" class="font-mono-tech text-[#FDCC0D] text-xs">15</span>
+                    </div>
+                    <input type="range" id="c-glitch" min="0" max="100" value="15" class="cyber-range">
+                </div>
 
-            <div class="group space-y-2">
-                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
-                    <span><i class="fa-solid fa-palette text-[#32527B] mr-2"></i> HUE_VELOCITY</span>
-                    <span id="val-cycle" class="font-mono-tech text-[#FDCC0D] text-xs">8</span>
+                <div class="group space-y-2">
+                    <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                        <span><i class="fa-solid fa-droplet text-[#32527B] mr-2"></i> MATTER_WARP</span>
+                        <span id="val-liquify" class="font-mono-tech text-[#FDCC0D] text-xs">25</span>
+                    </div>
+                    <input type="range" id="c-liquify" min="0" max="100" value="25" class="cyber-range">
                 </div>
-                <input type="range" id="c-cycle" min="0" max="100" value="8" class="cyber-range">
-            </div>
 
-            <div class="group space-y-2 mt-6 pt-4 border-t border-[#32527B]/20">
-                <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-[#FDCC0D] transition-colors">
-                    <span><i class="fa-solid fa-sun mr-2"></i> EXPOSURE_LVL</span>
-                    <span id="val-bright" class="font-mono-tech text-xs">1.1</span>
+                <div class="group space-y-2">
+                    <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                        <span><i class="fa-solid fa-barcode text-[#32527B] mr-2"></i> PHASE_DISTORT</span>
+                        <span id="val-distort" class="font-mono-tech text-[#FDCC0D] text-xs">10</span>
+                    </div>
+                    <input type="range" id="c-distort" min="0" max="100" value="10" class="cyber-range">
                 </div>
-                <input type="range" id="c-bright" min="0.5" max="3" step="0.1" value="1.1" class="cyber-range">
+
+                <div class="group space-y-2">
+                    <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-white transition-colors">
+                        <span><i class="fa-solid fa-palette text-[#32527B] mr-2"></i> HUE_VELOCITY</span>
+                        <span id="val-cycle" class="font-mono-tech text-[#FDCC0D] text-xs">8</span>
+                    </div>
+                    <input type="range" id="c-cycle" min="0" max="100" value="8" class="cyber-range">
+                </div>
+
+                <div class="group space-y-2 mt-4 pt-4 border-t border-[#32527B]/20">
+                    <div class="flex justify-between items-center text-[10px] tracking-widest font-bold text-white/60 group-hover:text-[#FDCC0D] transition-colors">
+                        <span><i class="fa-solid fa-sun mr-2"></i> EXPOSURE_LVL</span>
+                        <span id="val-bright" class="font-mono-tech text-xs">1.1</span>
+                    </div>
+                    <input type="range" id="c-bright" min="0.5" max="3" step="0.1" value="1.1" class="cyber-range">
+                </div>
             </div>
         </div>
     </div>
@@ -353,7 +388,7 @@
             // --- EXOTIC WAVE DISTORTION ---
             uv.y += sin(uv.x * 45.0 + u_time * 12.0) * (u_distort * 0.005);
 
-            // --- SHARP CHROMA GLITCH (Aberration) ---
+            // --- SHARP CHROMA GLITCH ---
             vec2 offsetR = vec2(0.0);
             vec2 offsetB = vec2(0.0);
             float gTrigger = step(0.96 - (u_glitch * 0.007), rand(vec2(u_time, 1.0)));
@@ -408,7 +443,7 @@
         let modulated = { ...currentParams };
         let locs = {};
 
-        // Setup Audio Bars HUD
+        // Configurar Barras de Audio HUD
         const NUM_BARS = 64;
         for(let i=0; i<NUM_BARS; i++) {
             const bar = document.createElement('div');
@@ -434,6 +469,43 @@
             }
         }
 
+        // Funciones de Overlay Custom
+        function updateCustomText(val) {
+            const textElement = document.getElementById('custom-text');
+            if(val.trim() === '') {
+                textElement.classList.add('hidden');
+            } else {
+                textElement.classList.remove('hidden');
+                textElement.innerText = val;
+            }
+        }
+
+        function handleLogoUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imgElement = document.getElementById('custom-logo');
+                    imgElement.src = e.target.result;
+                    imgElement.classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearOverlay() {
+            document.getElementById('custom-text-input').value = '';
+            document.getElementById('custom-text').classList.add('hidden');
+            document.getElementById('custom-text').innerText = '';
+            
+            const imgElement = document.getElementById('custom-logo');
+            imgElement.src = '';
+            imgElement.classList.add('hidden');
+            
+            document.getElementById('logo-upload').value = '';
+        }
+
+        // Setup WebGL
         function initGL() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -552,8 +624,8 @@
 
         async function toggleAudio() {
             const btn = document.getElementById('btn-audio');
-            const mainDot = document.getElementById('main-status-dot');
-            const mainTxt = document.getElementById('main-status-text');
+            const mainDot = document.getElementById('status-dot');
+            const mainTxt = document.getElementById('status-text');
 
             if (!isAudioActive) {
                 try {
@@ -574,10 +646,10 @@
                     mainDot.classList.replace('bg-[#32527B]', 'bg-[#B87333]');
                     mainDot.classList.add('shadow-[0_0_10px_#B87333]', 'animate-pulse');
                     mainTxt.innerText = 'AUDIO SYNCED';
-                    mainTxt.classList.replace('text-white/50', 'text-[#B87333]');
+                    mainTxt.classList.replace('text-[#FDCC0D]/70', 'text-[#B87333]');
                     audioBarsContainer.classList.add('active');
 
-                    // Auto-cerrar menú para inmersión
+                    // Auto-cerrar menú
                     setTimeout(() => { if(isMenuOpen) toggleMenu(); }, 800);
 
                 } catch (err) { 
@@ -589,8 +661,8 @@
                 btn.classList.remove('active');
                 mainDot.classList.replace('bg-[#B87333]', 'bg-[#32527B]');
                 mainDot.classList.remove('shadow-[0_0_10px_#B87333]', 'animate-pulse');
-                mainTxt.innerText = 'SYSTEM STANDBY';
-                mainTxt.classList.replace('text-[#B87333]', 'text-white/50');
+                mainTxt.innerText = 'AWAITING_AUDIO';
+                mainTxt.classList.replace('text-[#B87333]', 'text-[#FDCC0D]/70');
                 audioBarsContainer.classList.remove('active');
             }
         }
@@ -621,3 +693,4 @@
 </html>
 
 
+```
